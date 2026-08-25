@@ -52,6 +52,44 @@ header .wrap{position:relative;z-index:1}
 @media(max-width:650px){.entry-mode{flex-wrap:wrap}}
 </style>
 
+
+<style id="team-readable-v143">
+.team-setting-members{
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:10px !important;
+}
+.team-setting-members label{
+  display:flex !important;
+  align-items:center !important;
+  gap:10px !important;
+  min-height:46px;
+  padding:10px 12px !important;
+  border:1px solid #dfe5ef !important;
+  border-radius:10px !important;
+  background:#fff !important;
+  font-weight:700 !important;
+  line-height:1.2 !important;
+  white-space:normal !important;
+  overflow:visible !important;
+  word-break:normal !important;
+}
+.team-setting-members label input{
+  flex:0 0 auto;
+  width:18px !important;
+  height:18px !important;
+  margin:0 !important;
+}
+.team-setting-row{
+  overflow:visible !important;
+}
+@media(max-width:700px){
+  .team-setting-members{
+    grid-template-columns:1fr !important;
+  }
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -176,7 +214,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.2 SYNCHRO CORRIGÉE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.3 ÉQUIPES LISIBLES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
