@@ -98,7 +98,7 @@ header .wrap{position:relative;z-index:1}
    <div class="field"><label>Type de journée</label><select id="type"><option value="CONT">CONT — Journée continue</option><option value="CLA">CLA — Journée classique</option><option value="SAM">SAM — Samedi</option><option value="ABS">ABS — Absence</option><option value="MAL">MAL — Maladie</option><option value="AT">AT — Arrêt de travail</option><option value="CGE">CGE — Congés</option></select></div>
    <div id="timeFields">
     <div class="grid grid2">
-     <div class="field"><label>Heure d'embauche décalée <span class="muted">(facultatif)</span></label><input id="startOverride" type="time"></div>
+     <div class="field"><label>Heure d'embauche décalée <span class="muted">(facultatif)</span></label><input id="startOverride" type="time"><div class="muted" style="margin-top:5px">La débauche normale est recalculée automatiquement à partir de cette heure.</div></div>
      <div class="field"><label>Départ chantier</label><input id="depart" type="time"></div>
     </div>
     <div class="grid grid2">
@@ -176,7 +176,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4 ÉQUIPES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.1 ÉQUIPES / HORAIRES DÉCALÉS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -203,21 +203,57 @@ function mins(t){if(!t)return null;const [h,m]=t.split(':').map(Number);return h
 function time(m){if(m==null||isNaN(m))return '—';m=Math.max(0,Math.round(m));return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')}
 function clock(m){if(m==null)return '—';m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
 function dayKind(date){if(!date)return 'SE';const d=new Date(date+'T12:00:00').getDay();return(d===0||d===6)?'WE':'SE'}
-function calc(){const type=el('type').value,date=el('date').value,s=state.settings[type]||state.settings.CONT;const absence=['ABS','MAL','AT','CGE'].includes(type);el('timeFields').style.display=absence?'none':'block';if(absence){return {sup:0,route:0,real:0,presence:0,start:null,end:null,week:dayKind(date)}}
- const normalStart=mins(s.start),normalEnd=mins(s.end||s.start),start=mins(el('startOverride').value)||normalStart,depart=mins(el('depart').value),arrivee=mins(el('arrivee').value),ded=mins(el('deduction').value)||0;
+function calc(){
+ const type=el('type').value,date=el('date').value,s=state.settings[type]||state.settings.CONT;
+ const absence=['ABS','MAL','AT','CGE'].includes(type);
+ el('timeFields').style.display=absence?'none':'block';
+ if(absence){return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}}
+
+ const referenceStart=mins(s.start);
+ const referenceEnd=mins(s.end||s.start);
+ const override=mins(el('startOverride').value);
+ const shifted=override!=null;
+ const start=shifted?override:referenceStart;
+
+ // Si l'embauche est décalée, on conserve exactement l'amplitude
+ // de la journée de référence pour calculer la débauche normale.
+ let referenceDuration=Math.max(0,referenceEnd-referenceStart);
+ let normalEnd=shifted ? start+referenceDuration : referenceEnd;
+
+ const depart=mins(el('depart').value);
+ const arrivee=mins(el('arrivee').value);
+ const ded=mins(el('deduction').value)||0;
+
  let sup=0,route=0,presence=0;
  if(type==='SAM'){
+   // Samedi : logique existante conservée.
    if(depart!=null) sup=Math.max(0,depart-start);
    if(arrivee!=null&&depart!=null) route=Math.max(0,arrivee-depart);
- } else {
+ }else{
    if(depart!=null) sup=Math.max(0,depart-normalEnd);
-   if(arrivee!=null){const routeStart=Math.max(depart==null?normalEnd:depart,normalEnd);route=Math.max(0,arrivee-routeStart)}
+   if(arrivee!=null){
+     const routeStart=Math.max(depart==null?normalEnd:depart,normalEnd);
+     route=Math.max(0,arrivee-routeStart);
+   }
  }
  if(arrivee!=null) presence=Math.max(0,arrivee-start);
  const real=Math.max(0,sup-ded);
- return {sup,route,real,presence,start,normalEnd,ded,week:dayKind(date)}
+
+ return {sup,route,real,presence,start,normalEnd,ded,week:dayKind(date),shifted,referenceDuration}
 }
-function updateCalc(){const c=calc(),type=el('type').value,s=state.settings[type]||state.settings.CONT;el('normalRange').textContent=['ABS','MAL','AT','CGE'].includes(type)?'—':(s.start.replace(':','h')+'–'+(s.end||'—').replace(':','h'));el('sup').textContent=time(c.sup);el('route').textContent=time(c.route);el('real').textContent=time(c.real);el('startKept').textContent=c.start==null?'—':clock(c.start);el('endNormal').textContent=c.normalEnd==null?'—':clock(c.normalEnd);el('presence').textContent=time(c.presence);el('weekType').textContent=c.week;el('calcTitle').textContent=el('employee').value||'Résultat'}
+function updateCalc(){
+ const c=calc(),type=el('type').value;
+ const absence=['ABS','MAL','AT','CGE'].includes(type);
+ el('normalRange').textContent=absence?'—':(clock(c.start).replace(':','h')+'–'+clock(c.normalEnd).replace(':','h'));
+ el('sup').textContent=time(c.sup);
+ el('route').textContent=time(c.route);
+ el('real').textContent=time(c.real);
+ el('startKept').textContent=c.start==null?'—':clock(c.start);
+ el('endNormal').textContent=c.normalEnd==null?'—':clock(c.normalEnd);
+ el('presence').textContent=time(c.presence);
+ el('weekType').textContent=c.week;
+ el('calcTitle').textContent=el('employee').value||'Résultat';
+}
 function el(id){return document.getElementById(id)}
 function options(){const opts=state.employees.map(e=>`<option>${esc(e.name)}</option>`).join('');el('employee').innerHTML=opts;el('monthEmployee').innerHTML=opts}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
