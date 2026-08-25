@@ -176,7 +176,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.1 ÉQUIPES / HORAIRES DÉCALÉS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.2 SYNCHRO CORRIGÉE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -187,18 +187,68 @@ const defaultEmployees=[
  {name:'FOUCHER BAPTISTE',rate:12.50},{name:'JULIEN',rate:15.00},{name:'XAVIER',rate:16.88},{name:'GOIRE SYLVAIN',rate:14.70},{name:'QUENTIN',rate:15.82},{name:'MAXIME B',rate:13.16},{name:'CHRISTOPHER LARROZE-JARDINE',rate:14.70},{name:'THUBIN ALEXIS',rate:12.02},{name:'MAXIME MONCHAUX',rate:30.13}
 ];
 const defaultState={employees:defaultEmployees,settings:{CONT:{start:'07:15',end:'14:15'},CLA:{start:'07:15',end:'15:00',pauseStart:'12:15',pauseEnd:'13:00'},SAM:{start:'07:00',end:'14:00'},overtime:{rate1:10,rate2:25,thresholdHours:4}},entries:[]};
-let state=load();state.settings=state.settings||{};state.settings.teams=Array.isArray(state.settings.teams)?state.settings.teams:[];state.settings.overtime=Object.assign({rate1:10,rate2:25,thresholdHours:4},state.settings.overtime||{});let editId=null;
+let state=load();state.settings=normalizeSettings(state.settings);state.settings.overtime=Object.assign({rate1:10,rate2:25,thresholdHours:4},state.settings.overtime||{});let editId=null;
 function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return d&&d.entries?d:structuredClone(defaultState)}catch(e){return structuredClone(defaultState)}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(state))}
-function setSyncStatus(msg,ok=true){const x=el('syncStatus');if(x){x.textContent=msg;x.style.color=ok?'#166534':'#991b1b'}}
+
+function normalizeSettings(raw){
+ const base={
+   CONT:{start:'07:15',end:'14:15'},
+   CLA:{start:'07:15',end:'15:00',pauseStart:'12:15',pauseEnd:'13:00'},
+   SAM:{start:'07:00',end:'14:00'},
+   overtime:{rate1:10,rate2:25,thresholdHours:4},
+   teams:[]
+ };
+ const s=(raw&&typeof raw==='object')?raw:{};
+ return {
+   ...base,
+   ...s,
+   CONT:{...base.CONT,...(s.CONT||{})},
+   CLA:{...base.CLA,...(s.CLA||{})},
+   SAM:{...base.SAM,...(s.SAM||{})},
+   overtime:{...base.overtime,...(s.overtime||{})},
+   teams:Array.isArray(s.teams)?s.teams:[]
+ };
+}
+
+function setSyncStatus(msg,ok=true,detail=''){
+ const x=el('syncStatus');
+ if(x){x.textContent=msg;x.style.color=ok?'#166534':'#991b1b';x.title=detail||''}
+}
 function hmFromMinutes(m){m=Math.max(0,Number(m)||0);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(Math.round(m%60)).padStart(2,'0')}
 function entryToRow(e){return {entry_date:e.date,employee_name:e.employee,day_type:e.type||null,shifted_start:e.startOverride||null,chantier_depart:e.depart||null,depot_arrival:e.arrivee||null,deduction_minutes:mins(e.deduction)||0,comment:e.comment||null,overtime_minutes:e.sup||0,road_minutes:e.route||0,real_overtime_minutes:e.real||0,updated_at:new Date().toISOString()}}
 function rowToEntry(r){return {id:String(r.id||`${r.employee_name}|${r.entry_date}`),employee:r.employee_name,date:r.entry_date,type:r.day_type||'CONT',startOverride:r.shifted_start||'',depart:r.chantier_depart||'',arrivee:r.depot_arrival||'',deduction:hmFromMinutes(r.deduction_minutes||0),comment:r.comment||'',sup:Number(r.overtime_minutes)||0,route:Number(r.road_minutes)||0,real:Number(r.real_overtime_minutes)||0,presence:0,week:dayKind(r.entry_date)}}
 async function pushEmployees(){const {error:delErr}=await db.from('rml_heures_employees').delete().gte('id',0);if(delErr)throw delErr;if(state.employees.length){const rows=state.employees.map(e=>({name:e.name,hourly_rate:Number(e.rate)||0,active:true,updated_at:new Date().toISOString()}));const {error}=await db.from('rml_heures_employees').insert(rows);if(error)throw error}}
-async function pushSettings(){const {error}=await db.from('rml_heures_settings').upsert({setting_key:'app_settings',setting_value:JSON.stringify(state.settings),updated_at:new Date().toISOString()},{onConflict:'setting_key'});if(error)throw error}
+async function pushSettings(){
+ state.settings=normalizeSettings(state.settings);
+ const {error}=await db.from('rml_heures_settings').upsert({
+   setting_key:'app_settings',
+   setting_value:JSON.stringify(state.settings),
+   updated_at:new Date().toISOString()
+ },{onConflict:'setting_key'});
+ if(error)throw error
+}
 async function pushEntry(e){const {error}=await db.from('rml_heures_entries').upsert(entryToRow(e),{onConflict:'entry_date,employee_name'});if(error)throw error}
 async function pushAllEntries(){if(!state.entries.length)return;const {error}=await db.from('rml_heures_entries').upsert(state.entries.map(entryToRow),{onConflict:'entry_date,employee_name'});if(error)throw error}
-async function syncFromCloud(){if(!navigator.onLine){setSyncStatus('Hors ligne — sauvegarde locale',false);return false}setSyncStatus('Synchronisation…');try{const [er,sr,tr]=await Promise.all([db.from('rml_heures_employees').select('*').order('id'),db.from('rml_heures_settings').select('*').eq('setting_key','app_settings').maybeSingle(),db.from('rml_heures_entries').select('*').order('entry_date')]);if(er.error)throw er.error;if(sr.error)throw sr.error;if(tr.error)throw tr.error;if(er.data&&er.data.length){state.employees=er.data.filter(x=>x.active!==false).map(x=>({name:x.name,rate:Number(x.hourly_rate)||0}))}else{await pushEmployees()}if(sr.data?.setting_value){try{state.settings=JSON.parse(sr.data.setting_value)}catch(e){}}else{await pushSettings()}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();renderSettings();updateCalc();renderMonth();renderRecap();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){console.error(err);setSyncStatus('Erreur synchro — données locales conservées',false);return false}}
+async function syncFromCloud(){if(!navigator.onLine){setSyncStatus('Hors ligne — sauvegarde locale',false);return false}setSyncStatus('Synchronisation…');try{const [er,sr,tr]=await Promise.all([db.from('rml_heures_employees').select('*').order('id'),db.from('rml_heures_settings').select('*').eq('setting_key','app_settings').maybeSingle(),db.from('rml_heures_entries').select('*').order('entry_date')]);if(er.error)throw er.error;if(sr.error)throw sr.error;if(tr.error)throw tr.error;if(er.data&&er.data.length){state.employees=er.data.filter(x=>x.active!==false).map(x=>({name:x.name,rate:Number(x.hourly_rate)||0}))}else{await pushEmployees()}if(sr.data?.setting_value){
+  try{
+    state.settings=normalizeSettings(JSON.parse(sr.data.setting_value));
+    // Réécrit automatiquement le format actuel dans Supabase :
+    // cela migre les anciens réglages et ajoute teams/overtime manquants.
+    await pushSettings();
+  }catch(e){
+    console.warn('Réglages Supabase invalides, utilisation des valeurs sûres',e);
+    state.settings=normalizeSettings(state.settings);
+    await pushSettings();
+  }
+}else{
+  state.settings=normalizeSettings(state.settings);
+  await pushSettings();
+}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();renderSettings();updateCalc();renderMonth();renderRecap();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){
+ console.error('Erreur synchronisation Supabase :',err);
+ setSyncStatus('Erreur synchro — données locales conservées',false,err?.message||String(err));
+ return false
+}}
 function mins(t){if(!t)return null;const [h,m]=t.split(':').map(Number);return h*60+m}
 function time(m){if(m==null||isNaN(m))return '—';m=Math.max(0,Math.round(m));return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')}
 function clock(m){if(m==null)return '—';m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
@@ -314,7 +364,7 @@ function renderTeamPicker(){
  if(!el('teamMembers'))return;
  el('teamMembers').innerHTML=state.employees.map(e=>`<label class="team-check"><input class="teamMemberCheck" type="checkbox" value="${esc(e.name)}"><span>${esc(e.name)}</span></label>`).join('');
  document.querySelectorAll('.teamMemberCheck').forEach(x=>x.onchange=updateTeamSummary);
- if(el('teamPreset'))el('teamPreset').innerHTML='<option value="">— Sélection libre —</option>'+state.settings.teams.map((t,i)=>`<option value="${i}">${esc(t.name||('Équipe '+(i+1)))}</option>`).join('');
+ if(el('teamPreset'))el('teamPreset').innerHTML='<option value="">— Sélection libre —</option>'+(Array.isArray(state.settings.teams)?state.settings.teams:[]).map((t,i)=>`<option value="${i}">${esc(t.name||('Équipe '+(i+1)))}</option>`).join('');
  updateTeamSummary();
 }
 function applyTeamPreset(){
@@ -324,7 +374,7 @@ function applyTeamPreset(){
 }
 function renderTeamSettings(){
  if(!el('teamSettingsList'))return;
- el('teamSettingsList').innerHTML=state.settings.teams.map((t,i)=>`<div class="team-setting-row" data-team="${i}">
+ el('teamSettingsList').innerHTML=(Array.isArray(state.settings.teams)?state.settings.teams:[]).map((t,i)=>`<div class="team-setting-row" data-team="${i}">
   <div class="team-setting-head"><input class="teamName" value="${esc(t.name||'')}" placeholder="Nom de l’équipe"><button type="button" onclick="removeTeam(${i})">Supprimer</button></div>
   <div class="team-setting-members">${state.employees.map(e=>`<label><input type="checkbox" class="teamCfgMember" value="${esc(e.name)}" ${(t.members||[]).includes(e.name)?'checked':''}> ${esc(e.name)}</label>`).join('')}</div>
  </div>`).join('');
