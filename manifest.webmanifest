@@ -1,0 +1,17 @@
+{
+  "name": "RML Heures",
+  "short_name": "RML Heures",
+  "start_url": "./?app=rml-heures-v145",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f4db8",
+  "theme_color": "#0f5fd0",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png?v=145",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
