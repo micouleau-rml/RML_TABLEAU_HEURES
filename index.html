@@ -90,6 +90,28 @@ header .wrap{position:relative;z-index:1}
 }
 </style>
 
+
+<style id="team-collapse-v144">
+.team-settings-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.team-toggle-btn{
+  border:0;
+  background:#e9eef8;
+  color:#173b82;
+  border-radius:10px;
+  padding:8px 12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.team-settings.collapsed #teamSettingsBody{display:none}
+.team-settings.collapsed{padding-bottom:0}
+</style>
+
 </head>
 <body>
 <header>
@@ -205,16 +227,23 @@ header .wrap{position:relative;z-index:1}
    <div class="actions"><button class="primary" id="saveSettings">Enregistrer les réglages</button><button class="secondary" id="syncNow">Synchroniser maintenant</button></div>
   </div>
   <div class="card"><h2>Salariés et taux horaires</h2><div class="note" style="margin-bottom:12px">Le taux horaire est réglé individuellement pour chaque salarié et sert au calcul du montant des heures complémentaires.</div><div id="employeeSettings"></div><div class="actions"><button class="secondary" id="addEmployee">Ajouter un salarié</button><button class="primary" id="saveEmployees">Enregistrer les salariés</button></div>
-<div class="team-settings">
- <h3 style="margin:0 0 5px">Équipes habituelles</h3>
- <div class="muted" style="margin-bottom:10px">Crée tes équipes habituelles pour saisir une seule fois les mêmes horaires pour 2, 4 ou 5 salariés.</div>
- <div id="teamSettingsList"></div>
- <div class="actions"><button class="secondary" id="addTeam">Ajouter une équipe</button><button class="primary" id="saveTeams">Enregistrer les équipes</button></div>
+<div class="team-settings" id="teamSettingsPanel">
+ <div class="team-settings-header">
+  <div>
+   <h3 style="margin:0 0 5px">Équipes habituelles</h3>
+   <div class="muted">Crée tes équipes habituelles pour saisir une seule fois les mêmes horaires pour 2, 4 ou 5 salariés.</div>
+  </div>
+  <button type="button" class="team-toggle-btn" id="toggleTeamSettings">Fermer</button>
+ </div>
+ <div id="teamSettingsBody">
+  <div id="teamSettingsList"></div>
+  <div class="actions"><button class="secondary" id="addTeam">Ajouter une équipe</button><button class="primary" id="saveTeams">Enregistrer les équipes</button></div>
+ </div>
 </div></div>
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.3 ÉQUIPES LISIBLES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.4 ÉQUIPES REPLIABLES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -434,7 +463,17 @@ function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').valu
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
-el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
+el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
+if(el('toggleTeamSettings')){
+ el('toggleTeamSettings').onclick=()=>{
+  const p=el('teamSettingsPanel');
+  const collapsed=p.classList.toggle('collapsed');
+  el('toggleTeamSettings').textContent=collapsed?'Ouvrir':'Fermer';
+  localStorage.setItem('rml_team_settings_collapsed',collapsed?'1':'0');
+ };
+ const collapsed=localStorage.getItem('rml_team_settings_collapsed')==='1';
+ if(collapsed){el('teamSettingsPanel').classList.add('collapsed');el('toggleTeamSettings').textContent='Ouvrir'}
+}el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
 options();setToday();renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();syncFromCloud();
 </script>
 </body>
