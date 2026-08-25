@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#111827" />
+<title>RML Heures</title>
+<style>
+:root{--bg:#eef1f5;--card:#fff;--ink:#151b26;--muted:#6b7280;--nav:#111827;--accent:#b91c1c;--accent2:#1d4ed8;--ok:#15803d;--warn:#b45309;--line:#d7dce3;--shadow:0 10px 30px rgba(15,23,42,.10);--r:18px}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{position:sticky;top:0;z-index:10;background:linear-gradient(135deg,#0f172a,#1f2937);color:#fff;padding:14px 16px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.brand{max-width:1250px;margin:auto;display:flex;align-items:center;gap:14px}.logo{width:46px;height:46px;border-radius:13px;background:#fff;color:#111827;font-weight:900;display:grid;place-items:center;letter-spacing:-1px}.brand h1{font-size:20px;margin:0}.brand small{opacity:.75}
+nav{max-width:1250px;margin:10px auto 0;display:flex;gap:8px;overflow:auto}.tab{border:0;background:rgba(255,255,255,.1);color:#fff;padding:9px 13px;border-radius:999px;font-weight:700;white-space:nowrap}.tab.active{background:#fff;color:#111827}
+main{max-width:1250px;margin:18px auto 80px;padding:0 14px}.view{display:none}.view.active{display:block}.grid{display:grid;gap:14px}.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}.grid3{grid-template-columns:repeat(3,minmax(0,1fr))}.card{background:var(--card);border:1px solid #e2e6ec;border-radius:var(--r);box-shadow:var(--shadow);padding:16px}.card h2,.card h3{margin:0 0 14px}.section-title{font-size:14px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:800;margin-bottom:8px}
+label{display:block;font-size:12px;font-weight:800;color:#4b5563;margin:0 0 6px}input,select,textarea{width:100%;border:1px solid #cfd5dd;border-radius:12px;padding:11px 12px;background:#fff;color:#111827;font-size:16px;outline:none}input:focus,select:focus,textarea:focus{border-color:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.12)}.field{margin-bottom:12px}
+button.primary,button.secondary,button.danger{border:0;border-radius:12px;padding:12px 15px;font-weight:800;font-size:15px;cursor:pointer}.primary{background:var(--accent2);color:#fff}.secondary{background:#e5e7eb;color:#111827}.danger{background:#fee2e2;color:#991b1b}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1;min-width:170px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:13px}.kpi b{display:block;font-size:23px;margin-top:3px}.kpi span{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}.kpi.sup b{color:var(--accent)}.kpi.route b{color:var(--accent2)}.kpi.real b{color:var(--ok)}
+.note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px 12px;font-size:13px}.muted{color:var(--muted);font-size:13px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:#e5e7eb}.badge.CONT{background:#dbeafe;color:#1e40af}.badge.CLA{background:#ede9fe;color:#5b21b6}.badge.SAM{background:#ffedd5;color:#9a3412}.badge.ABS,.badge.MAL,.badge.AT{background:#fee2e2;color:#991b1b}.badge.CGE{background:#dcfce7;color:#166534}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}th{position:sticky;top:0;background:#f3f4f6;text-align:left;color:#475569;font-size:11px;text-transform:uppercase;padding:10px;border-bottom:1px solid #d9dee5}td{padding:10px;border-bottom:1px solid #edf0f3;white-space:nowrap}.table-wrap{overflow:auto;border:1px solid #e1e5ea;border-radius:14px;max-height:62vh}.row-actions button{border:0;background:#eef2f7;border-radius:8px;padding:6px 8px;cursor:pointer}.empty{text-align:center;color:var(--muted);padding:35px}
+.employee-row{display:grid;grid-template-columns:1fr 140px 42px;gap:8px;align-items:end;margin-bottom:8px}.employee-row button{height:44px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900}.switchline{display:flex;align-items:center;gap:10px;margin:10px 0}.switchline input{width:auto}
+footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-top:1px solid #dce1e8;padding:8px 12px;z-index:9}.footer-inner{max-width:1250px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:12px}
+@media(max-width:800px){.grid2,.grid3{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.brand h1{font-size:17px}.card{padding:14px}.employee-row{grid-template-columns:1fr 95px 42px}}
+</style>
+</head>
+<body>
+<header>
+ <div class="brand"><div class="logo">RML</div><div><h1>RML HEURES</h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+ <nav>
+  <button class="tab active" data-view="saisie">Saisie</button>
+  <button class="tab" data-view="mois">Mois</button>
+  <button class="tab" data-view="recap">Récapitulatif</button>
+  <button class="tab" data-view="reglages">Réglages</button>
+ </nav>
+</header>
+<main>
+<section id="saisie" class="view active">
+ <div class="grid grid2">
+  <div class="card">
+   <h2>Saisie de la journée</h2>
+   <div class="grid grid2">
+    <div class="field"><label>Salarié</label><select id="employee"></select></div>
+    <div class="field"><label>Date</label><input id="date" type="date"></div>
+   </div>
+   <div class="field"><label>Type de journée</label><select id="type"><option value="CONT">CONT — Journée continue</option><option value="CLA">CLA — Journée classique</option><option value="SAM">SAM — Samedi</option><option value="ABS">ABS — Absence</option><option value="MAL">MAL — Maladie</option><option value="AT">AT — Arrêt de travail</option><option value="CGE">CGE — Congés</option></select></div>
+   <div id="timeFields">
+    <div class="grid grid2">
+     <div class="field"><label>Heure d'embauche décalée <span class="muted">(facultatif)</span></label><input id="startOverride" type="time"></div>
+     <div class="field"><label>Départ chantier</label><input id="depart" type="time"></div>
+    </div>
+    <div class="grid grid2">
+     <div class="field"><label>Arrivée dépôt</label><input id="arrivee" type="time"></div>
+     <div class="field"><label>Déduction sur heures sup</label><input id="deduction" type="time" value="00:00"></div>
+    </div>
+   </div>
+   <div class="field"><label>Commentaire</label><textarea id="comment" rows="2" placeholder="Ex. rendez-vous, départ anticipé, observation..."></textarea></div>
+   <div class="actions"><button class="primary" id="saveBtn">Enregistrer la journée</button><button class="secondary" id="clearBtn">Nouvelle saisie</button></div>
+  </div>
+  <div class="card">
+   <div class="section-title">Calcul instantané</div>
+   <h2 id="calcTitle">Résultat</h2>
+   <div class="kpis">
+    <div class="kpi"><span>Horaire normal</span><b id="normalRange">7h15–14h15</b></div>
+    <div class="kpi sup"><span>H sup chantier</span><b id="sup">0h00</b></div>
+    <div class="kpi route"><span>H route</span><b id="route">0h00</b></div>
+    <div class="kpi real"><span>H sup réelles</span><b id="real">0h00</b></div>
+   </div>
+   <div style="height:12px"></div>
+   <div class="kpis">
+    <div class="kpi"><span>Embauche retenue</span><b id="startKept">7h15</b></div>
+    <div class="kpi"><span>Débauche normale</span><b id="endNormal">14h15</b></div>
+    <div class="kpi"><span>Temps présence</span><b id="presence">0h00</b></div>
+    <div class="kpi"><span>Jour</span><b id="weekType">SE</b></div>
+   </div>
+   <div style="height:12px"></div>
+   <div class="note">Principe repris de ton Excel : les heures sup chantier commencent après l'heure normale de débauche. Les heures de route ne retiennent que la partie du retour située après cette heure. La déduction est soustraite des heures sup chantier.</div>
+  </div>
+ </div>
+</section>
+
+<section id="mois" class="view">
+ <div class="card">
+  <div class="grid grid3">
+   <div class="field"><label>Salarié</label><select id="monthEmployee"></select></div>
+   <div class="field"><label>Mois</label><input id="monthPick" type="month"></div>
+   <div class="field"><label>&nbsp;</label><button class="secondary" id="exportCsv">Exporter CSV</button></div>
+  </div>
+  <div id="monthKpis" class="kpis" style="margin-bottom:14px"></div>
+  <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Embauche</th><th>Départ</th><th>Arrivée</th><th>H sup</th><th>H route</th><th>Déduction</th><th>H sup réelles</th><th>Commentaire</th><th></th></tr></thead><tbody id="monthBody"></tbody></table></div>
+ </div>
+</section>
+
+<section id="recap" class="view">
+ <div class="card">
+  <div class="grid grid2"><div class="field"><label>Mois</label><input id="recapMonth" type="month"></div><div class="field"><label>&nbsp;</label><button class="secondary" id="printRecap">Imprimer / PDF</button></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Salarié</th><th>Taux horaire</th><th>Jours saisis</th><th>H sup chantier</th><th>H route</th><th>Déductions</th><th>H sup réelles</th><th>HC 10%</th><th>HC 25%</th><th>Montant HC</th><th>ABS</th><th>MAL</th><th>AT</th><th>CGE</th></tr></thead><tbody id="recapBody"></tbody></table></div>
+ </div>
+</section>
+
+<section id="reglages" class="view">
+ <div class="grid grid2">
+  <div class="card">
+   <h2>Horaires de référence</h2>
+   <div class="section-title">Journée continue</div><div class="grid grid2"><div class="field"><label>Embauche</label><input id="contStart" type="time"></div><div class="field"><label>Débauche</label><input id="contEnd" type="time"></div></div>
+   <div class="section-title">Journée classique</div><div class="grid grid2"><div class="field"><label>Embauche</label><input id="claStart" type="time"></div><div class="field"><label>Débauche</label><input id="claEnd" type="time"></div></div><div class="grid grid2"><div class="field"><label>Début pause</label><input id="pauseStart" type="time"></div><div class="field"><label>Fin pause</label><input id="pauseEnd" type="time"></div></div>
+   <div class="section-title">Samedi</div><div class="field"><label>Embauche</label><input id="samStart" type="time"></div>
+   <div class="section-title" style="margin-top:18px">Heures supplémentaires</div>
+   <div class="grid grid3">
+    <div class="field"><label>Majoration tranche 1 (%)</label><input id="otRate1" type="number" min="0" step="0.1"></div>
+    <div class="field"><label>Majoration tranche 2 (%)</label><input id="otRate2" type="number" min="0" step="0.1"></div>
+    <div class="field"><label>Limite tranche 1 / semaine (h)</label><input id="otThreshold" type="number" min="0" step="0.25"></div>
+   </div>
+   <div class="note" style="margin-bottom:14px">Réglage repris de ton tableau : première tranche d'heures complémentaires à 10 %, puis tranche suivante à 25 %. Les pourcentages et la limite hebdomadaire restent modifiables ici.</div>
+   <button class="primary" id="saveSettings">Enregistrer les réglages</button>
+  </div>
+  <div class="card"><h2>Salariés et taux horaires</h2><div class="note" style="margin-bottom:12px">Le taux horaire est réglé individuellement pour chaque salarié et sert au calcul du montant des heures complémentaires.</div><div id="employeeSettings"></div><div class="actions"><button class="secondary" id="addEmployee">Ajouter un salarié</button><button class="primary" id="saveEmployees">Enregistrer les salariés</button></div></div>
+ </div>
+</section>
+</main>
+<footer><div class="footer-inner"><span>RML HEURES — V1.1</span><span>Sauvegarde locale sur cet appareil</span></div></footer>
+<script>
+const KEY='rml_heures_v1';
+const defaultEmployees=[
+ {name:'FOUCHER BAPTISTE',rate:12.50},{name:'JULIEN',rate:15.00},{name:'XAVIER',rate:16.88},{name:'GOIRE SYLVAIN',rate:14.70},{name:'QUENTIN',rate:15.82},{name:'MAXIME B',rate:13.16},{name:'CHRISTOPHER LARROZE-JARDINE',rate:14.70},{name:'THUBIN ALEXIS',rate:12.02},{name:'MAXIME MONCHAUX',rate:30.13}
+];
+const defaultState={employees:defaultEmployees,settings:{CONT:{start:'07:15',end:'14:15'},CLA:{start:'07:15',end:'15:00',pauseStart:'12:15',pauseEnd:'13:00'},SAM:{start:'07:00',end:'14:00'},overtime:{rate1:10,rate2:25,thresholdHours:4}},entries:[]};
+let state=load();state.settings=state.settings||{};state.settings.overtime=Object.assign({rate1:10,rate2:25,thresholdHours:4},state.settings.overtime||{});let editId=null;
+function load(){try{const d=JSON.parse(localStorage.getItem(KEY));return d&&d.entries?d:structuredClone(defaultState)}catch(e){return structuredClone(defaultState)}}
+function persist(){localStorage.setItem(KEY,JSON.stringify(state))}
+function mins(t){if(!t)return null;const [h,m]=t.split(':').map(Number);return h*60+m}
+function time(m){if(m==null||isNaN(m))return '—';m=Math.max(0,Math.round(m));return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0')}
+function clock(m){if(m==null)return '—';m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')}
+function dayKind(date){if(!date)return 'SE';const d=new Date(date+'T12:00:00').getDay();return(d===0||d===6)?'WE':'SE'}
+function calc(){const type=el('type').value,date=el('date').value,s=state.settings[type]||state.settings.CONT;const absence=['ABS','MAL','AT','CGE'].includes(type);el('timeFields').style.display=absence?'none':'block';if(absence){return {sup:0,route:0,real:0,presence:0,start:null,end:null,week:dayKind(date)}}
+ const normalStart=mins(s.start),normalEnd=mins(s.end||s.start),start=mins(el('startOverride').value)||normalStart,depart=mins(el('depart').value),arrivee=mins(el('arrivee').value),ded=mins(el('deduction').value)||0;
+ let sup=0,route=0,presence=0;
+ if(type==='SAM'){
+   if(depart!=null) sup=Math.max(0,depart-start);
+   if(arrivee!=null&&depart!=null) route=Math.max(0,arrivee-depart);
+ } else {
+   if(depart!=null) sup=Math.max(0,depart-normalEnd);
+   if(arrivee!=null){const routeStart=Math.max(depart==null?normalEnd:depart,normalEnd);route=Math.max(0,arrivee-routeStart)}
+ }
+ if(arrivee!=null) presence=Math.max(0,arrivee-start);
+ const real=Math.max(0,sup-ded);
+ return {sup,route,real,presence,start,normalEnd,ded,week:dayKind(date)}
+}
+function updateCalc(){const c=calc(),type=el('type').value,s=state.settings[type]||state.settings.CONT;el('normalRange').textContent=['ABS','MAL','AT','CGE'].includes(type)?'—':(s.start.replace(':','h')+'–'+(s.end||'—').replace(':','h'));el('sup').textContent=time(c.sup);el('route').textContent=time(c.route);el('real').textContent=time(c.real);el('startKept').textContent=c.start==null?'—':clock(c.start);el('endNormal').textContent=c.normalEnd==null?'—':clock(c.normalEnd);el('presence').textContent=time(c.presence);el('weekType').textContent=c.week;el('calcTitle').textContent=el('employee').value||'Résultat'}
+function el(id){return document.getElementById(id)}
+function options(){const opts=state.employees.map(e=>`<option>${esc(e.name)}</option>`).join('');el('employee').innerHTML=opts;el('monthEmployee').innerHTML=opts}
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function setToday(){const d=new Date();el('date').value=d.toISOString().slice(0,10);const ym=d.toISOString().slice(0,7);el('monthPick').value=ym;el('recapMonth').value=ym}
+function saveEntry(){const c=calc();const type=el('type').value;const entry={id:editId||crypto.randomUUID(),employee:el('employee').value,date:el('date').value,type,startOverride:el('startOverride').value,depart:el('depart').value,arrivee:el('arrivee').value,deduction:el('deduction').value||'00:00',comment:el('comment').value,sup:c.sup,route:c.route,real:c.real,presence:c.presence,week:c.week};if(!entry.employee||!entry.date)return alert('Choisis le salarié et la date.');const i=state.entries.findIndex(x=>x.id===entry.id);if(i>=0)state.entries[i]=entry;else state.entries.push(entry);persist();clearForm();renderMonth();renderRecap();alert('Journée enregistrée.');}
+function clearForm(){editId=null;el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
+function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
+function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap()}
+function renderMonth(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));let totals={sup:0,route:0,real:0,ded:0};rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0});el('monthKpis').innerHTML=`<div class="kpi sup"><span>H sup chantier</span><b>${time(totals.sup)}</b></div><div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div><div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div><div class="kpi real"><span>H sup réelles</span><b>${time(totals.real)}</b></div>`;el('monthBody').innerHTML=rows.length?rows.map(e=>`<tr><td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td><td><span class="badge ${e.type}">${e.type}</span></td><td>${e.startOverride||state.settings[e.type]?.start||'—'}</td><td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td><td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td><td><b>${time(e.real)}</b></td><td>${esc(e.comment)}</td><td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`}
+function weekKey(date){const d=new Date(date+'T12:00:00');const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day+3);const first=new Date(d.getFullYear(),0,4);const firstDay=(first.getDay()+6)%7;first.setDate(first.getDate()-firstDay+3);const week=1+Math.round((d-first)/604800000);return d.getFullYear()+'-W'+String(week).padStart(2,'0')}
+function splitOvertime(rows){const cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};const limit=(Number(cfg.thresholdHours)||0)*60;const byWeek={};rows.forEach(e=>{const k=weekKey(e.date);(byWeek[k]||(byWeek[k]=[])).push(e)});let m1=0,m2=0;Object.values(byWeek).forEach(list=>{const total=list.reduce((a,e)=>a+(e.real||0),0);m1+=Math.min(total,limit);m2+=Math.max(0,total-limit)});return {m1,m2}}
+function money(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
+function renderRecap(){const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};el('recapBody').innerHTML=state.employees.map(emp=>{const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),count=t=>r.filter(e=>e.type===t).length,sp=splitOvertime(r),rate=Number(emp.rate)||0;const amount=(sp.m1/60)*rate*(1+Number(cfg.rate1||0)/100)+(sp.m2/60)*rate*(1+Number(cfg.rate2||0)/100);return `<tr><td><b>${esc(emp.name)}</b></td><td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td><td><b>${time(sum('real'))}</b></td><td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amount)}</b></td><td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td></tr>`}).join('')}
+function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;renderEmployeeSettings()}
+function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
+function removeEmployee(i){state.employees.splice(i,1);renderEmployeeSettings()}
+function addEmployee(){state.employees.push({name:'NOUVEAU SALARIÉ',rate:0});renderEmployeeSettings()}
+function saveEmployees(){document.querySelectorAll('[data-n]').forEach(x=>state.employees[+x.dataset.n].name=x.value.trim());document.querySelectorAll('[data-r]').forEach(x=>state.employees[+x.dataset.r].rate=Number(x.value)||0);state.employees=state.employees.filter(e=>e.name);persist();options();renderMonth();renderRecap();alert('Salariés enregistrés.')}
+function saveSettings(){state.settings.CONT={start:el('contStart').value,end:el('contEnd').value};state.settings.CLA={start:el('claStart').value,end:el('claEnd').value,pauseStart:el('pauseStart').value,pauseEnd:el('pauseEnd').value};state.settings.SAM={start:el('samStart').value,end:state.settings.SAM.end||'14:00'};state.settings.overtime={rate1:Number(el('otRate1').value)||0,rate2:Number(el('otRate2').value)||0,thresholdHours:Number(el('otThreshold').value)||0};persist();updateCalc();renderRecap();alert('Réglages enregistrés.')}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
+function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();
+options();setToday();renderSettings();updateCalc();renderMonth();renderRecap();
+</script>
+</body>
+</html>
