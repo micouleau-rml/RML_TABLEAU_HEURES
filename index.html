@@ -16,7 +16,7 @@ main{max-width:1250px;margin:18px auto 80px;padding:0 14px}.view{display:none}.v
 label{display:block;font-size:12px;font-weight:800;color:#4b5563;margin:0 0 6px}input,select,textarea{width:100%;border:1px solid #cfd5dd;border-radius:12px;padding:11px 12px;background:#fff;color:#111827;font-size:16px;outline:none}input:focus,select:focus,textarea:focus{border-color:#64748b;box-shadow:0 0 0 3px rgba(100,116,139,.12)}.field{margin-bottom:12px}
 button.primary,button.secondary,button.danger{border:0;border-radius:12px;padding:12px 15px;font-weight:800;font-size:15px;cursor:pointer}.primary{background:var(--accent2);color:#fff}.secondary{background:#e5e7eb;color:#111827}.danger{background:#fee2e2;color:#991b1b}.actions{display:flex;gap:10px;flex-wrap:wrap}.actions button{flex:1;min-width:170px}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.kpi{border:1px solid #e2e8f0;background:#f8fafc;border-radius:14px;padding:13px}.kpi b{display:block;font-size:23px;margin-top:3px}.kpi span{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}.kpi.sup b{color:var(--accent)}.kpi.route b{color:var(--accent2)}.kpi.real b{color:var(--ok)}
-.note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px 12px;font-size:13px}.muted{color:var(--muted);font-size:13px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:#e5e7eb}.badge.CONT{background:#dbeafe;color:#1e40af}.badge.CLA{background:#ede9fe;color:#5b21b6}.badge.SAM{background:#ffedd5;color:#9a3412}.badge.ABS,.badge.MAL,.badge.AT{background:#fee2e2;color:#991b1b}.badge.CGE{background:#dcfce7;color:#166534}
+.note{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:10px 12px;font-size:13px}.muted{color:var(--muted);font-size:13px}.badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:800;background:#e5e7eb}.badge.CONT{background:#dbeafe;color:#1e40af}.badge.CLA{background:#ede9fe;color:#5b21b6}.badge.SAM{background:#ffedd5;color:#9a3412}.badge.ABS,.badge.MAL,.badge.AT{background:#fee2e2;color:#991b1b}.badge.CGE{background:#dcfce7;color:#166534}.badge.FORM{background:#fef3c7;color:#92400e}
 table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}th{position:sticky;top:0;background:#f3f4f6;text-align:left;color:#475569;font-size:11px;text-transform:uppercase;padding:10px;border-bottom:1px solid #d9dee5}td{padding:10px;border-bottom:1px solid #edf0f3;white-space:nowrap}.table-wrap{overflow:auto;border:1px solid #e1e5ea;border-radius:14px;max-height:62vh}.row-actions button{border:0;background:#eef2f7;border-radius:8px;padding:6px 8px;cursor:pointer}.empty{text-align:center;color:var(--muted);padding:35px}
 .employee-row{display:grid;grid-template-columns:1fr 140px 42px;gap:8px;align-items:end;margin-bottom:8px}.employee-row button{height:44px;border:0;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:900}.switchline{display:flex;align-items:center;gap:10px;margin:10px 0}.switchline input{width:auto}
 footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-top:1px solid #dce1e8;padding:8px 12px;z-index:9}.footer-inner{max-width:1250px;margin:auto;display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:12px}
@@ -116,6 +116,13 @@ header .wrap{position:relative;z-index:1}
 <meta name="apple-mobile-web-app-title" content="RML Heures">
 <meta name="application-name" content="RML Heures">
 
+
+<style id="v146-form-conges">
+#leaveRange{display:none;margin-top:10px;padding:12px;border:1px solid #dbe7ff;background:#f4f8ff;border-radius:12px}
+#leaveRange.active{display:block}
+#leaveRange .hint{font-size:12px;color:#5f6b7a;margin-top:6px}
+</style>
+
 </head>
 <body>
 <header>
@@ -158,8 +165,12 @@ header .wrap{position:relative;z-index:1}
    <div class="grid grid2">
     <div class="field"><label>Salarié</label><select id="employee"></select></div>
     <div class="field"><label>Date</label><input id="date" type="date"></div>
+   <div id="leaveRange">
+    <div class="field" style="margin:0"><label>Date de fin des congés</label><input id="leaveEnd" type="date"></div>
+    <div class="hint">Les samedis et dimanches sont ignorés automatiquement.</div>
    </div>
-   <div class="field"><label>Type de journée</label><select id="type"><option value="CONT">CONT — Journée continue</option><option value="CLA">CLA — Journée classique</option><option value="SAM">SAM — Samedi</option><option value="ABS">ABS — Absence</option><option value="MAL">MAL — Maladie</option><option value="AT">AT — Arrêt de travail</option><option value="CGE">CGE — Congés</option></select></div>
+   </div>
+   <div class="field"><label>Type de journée</label><select id="type"><option value="CONT">CONT — Journée continue</option><option value="CLA">CLA — Journée classique</option><option value="SAM">SAM — Samedi</option><option value="ABS">ABS — Absence</option><option value="MAL">MAL — Maladie</option><option value="AT">AT — Arrêt de travail</option><option value="CGE">CGE — Congés</option><option value="FORM">FORM — En formation</option></select></div>
    <div id="timeFields">
     <div class="grid grid2">
      <div class="field"><label>Heure d'embauche décalée <span class="muted">(facultatif)</span></label><input id="startOverride" type="time"><div class="muted" style="margin-top:5px">La débauche normale est recalculée automatiquement à partir de cette heure.</div></div>
@@ -210,7 +221,7 @@ header .wrap{position:relative;z-index:1}
 <section id="recap" class="view">
  <div class="card">
   <div class="grid grid2"><div class="field"><label>Mois</label><input id="recapMonth" type="month"></div><div class="field"><label>&nbsp;</label><button class="secondary" id="printRecap">Imprimer / PDF</button></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Salarié</th><th>Taux horaire</th><th>Jours saisis</th><th>H sup chantier</th><th>H route</th><th>Déductions</th><th>H sup réelles</th><th>HC 10%</th><th>HC 25%</th><th>Montant HC</th><th>ABS</th><th>MAL</th><th>AT</th><th>CGE</th></tr></thead><tbody id="recapBody"></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>Salarié</th><th>Taux horaire</th><th>Jours saisis</th><th>H sup chantier</th><th>H route</th><th>Déductions</th><th>H sup réelles</th><th>HC 10%</th><th>HC 25%</th><th>Montant HC</th><th>ABS</th><th>MAL</th><th>AT</th><th>CGE</th><th>FORM</th></tr></thead><tbody id="recapBody"></tbody></table></div>
  </div>
 </section>
 
@@ -247,7 +258,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.5 ICÔNE DÉDIÉE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.6 FORMATION + CONGÉS MULTI-DATES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -327,19 +338,34 @@ function dayKind(date){if(!date)return 'SE';const d=new Date(date+'T12:00:00').g
 function calc(){
  const type=el('type').value,date=el('date').value,s=state.settings[type]||state.settings.CONT;
  const absence=['ABS','MAL','AT','CGE'].includes(type);
- el('timeFields').style.display=absence?'none':'block';
- if(absence){return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}}
+ const formation=type==='FORM';
 
- const referenceStart=mins(s.start);
- const referenceEnd=mins(s.end||s.start);
+ el('timeFields').style.display=(absence||formation)?'none':'block';
+ el('leaveRange')?.classList.toggle('active',type==='CGE');
+ if(type!=='CGE'&&el('leaveEnd'))el('leaveEnd').value='';
+
+ if(absence){
+   return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}
+ }
+
+ const referenceStart=mins((formation?state.settings.CONT:s).start);
+ const referenceEnd=mins((formation?state.settings.CONT:s).end||(formation?state.settings.CONT:s).start);
+
+ if(formation){
+   return {
+     sup:0,route:0,real:0,
+     presence:Math.max(0,referenceEnd-referenceStart),
+     start:referenceStart,normalEnd:referenceEnd,ded:0,
+     week:dayKind(date),shifted:false,
+     referenceDuration:Math.max(0,referenceEnd-referenceStart)
+   }
+ }
+
  const override=mins(el('startOverride').value);
  const shifted=override!=null;
  const start=shifted?override:referenceStart;
-
- // Si l'embauche est décalée, on conserve exactement l'amplitude
- // de la journée de référence pour calculer la débauche normale.
- let referenceDuration=Math.max(0,referenceEnd-referenceStart);
- let normalEnd=shifted ? start+referenceDuration : referenceEnd;
+ const referenceDuration=Math.max(0,referenceEnd-referenceStart);
+ const normalEnd=shifted ? start+referenceDuration : referenceEnd;
 
  const depart=mins(el('depart').value);
  const arrivee=mins(el('arrivee').value);
@@ -347,7 +373,6 @@ function calc(){
 
  let sup=0,route=0,presence=0;
  if(type==='SAM'){
-   // Samedi : logique existante conservée.
    if(depart!=null) sup=Math.max(0,depart-start);
    if(arrivee!=null&&depart!=null) route=Math.max(0,arrivee-depart);
  }else{
@@ -379,41 +404,94 @@ function el(id){return document.getElementById(id)}
 function options(){const opts=state.employees.map(e=>`<option>${esc(e.name)}</option>`).join('');el('employee').innerHTML=opts;el('monthEmployee').innerHTML=opts}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 function setToday(){const d=new Date();el('date').value=d.toISOString().slice(0,10);const ym=d.toISOString().slice(0,7);el('monthPick').value=ym;el('recapMonth').value=ym}
+function workingDatesBetween(startDate,endDate){
+ if(!startDate)return [];
+ const end=endDate||startDate;
+ const a=new Date(startDate+'T12:00:00'),b=new Date(end+'T12:00:00');
+ if(b<a)return null;
+ const dates=[];
+ for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1)){
+   const day=d.getDay();
+   if(day!==0&&day!==6)dates.push(d.toISOString().slice(0,10));
+ }
+ return dates;
+}
 async function saveEntry(){
  const c=calc(),type=el('type').value,date=el('date').value;
  const teamMode=el('teamModeBtn')?.classList.contains('active');
  const employees=teamMode
    ? Array.from(document.querySelectorAll('.teamMemberCheck:checked')).map(x=>x.value)
    : [el('employee').value];
+
  if(!date)return alert('Choisis la date.');
  if(!employees.length||!employees[0])return alert(teamMode?'Sélectionne au moins un salarié dans l’équipe.':'Choisis le salarié.');
- const base={date,type,startOverride:el('startOverride').value,depart:el('depart').value,arrivee:el('arrivee').value,deduction:el('deduction').value||'00:00',comment:el('comment').value,sup:c.sup,route:c.route,real:c.real,presence:c.presence,week:c.week};
- const saved=[];
- for(const employee of employees){
-   const entry={id:(!teamMode&&editId)||crypto.randomUUID(),employee,...base};
-   const duplicate=state.entries.findIndex(x=>x.employee===employee&&x.date===date);
-   const i=state.entries.findIndex(x=>x.id===entry.id);
-   if(i>=0)state.entries[i]=entry; else if(duplicate>=0){entry.id=state.entries[duplicate].id;state.entries[duplicate]=entry}else state.entries.push(entry);
-   saved.push(entry);
+
+ let dates=[date];
+ if(type==='CGE'&&el('leaveEnd')?.value){
+   dates=workingDatesBetween(date,el('leaveEnd').value);
+   if(dates===null)return alert('La date de fin des congés doit être postérieure ou égale à la date de début.');
+   if(!dates.length)return alert('La période choisie ne contient aucun jour ouvré.');
  }
+
+ const formation=type==='FORM';
+ const absence=['ABS','MAL','AT','CGE'].includes(type);
+ const saved=[];
+
+ for(const entryDate of dates){
+   const dayCalc=(entryDate===date)?c:{
+     sup:0,route:0,real:0,
+     presence:formation?Math.max(0,mins(state.settings.CONT.end)-mins(state.settings.CONT.start)):0,
+     week:dayKind(entryDate)
+   };
+
+   const base={
+     date:entryDate,
+     type,
+     startOverride:(formation||absence)?'':el('startOverride').value,
+     depart:(formation||absence)?'':el('depart').value,
+     arrivee:(formation||absence)?'':el('arrivee').value,
+     deduction:(formation||absence)?'00:00':(el('deduction').value||'00:00'),
+     comment:el('comment').value,
+     sup:dayCalc.sup||0,
+     route:dayCalc.route||0,
+     real:dayCalc.real||0,
+     presence:dayCalc.presence||0,
+     week:dayCalc.week||dayKind(entryDate)
+   };
+
+   for(const employee of employees){
+     const entry={id:(dates.length===1&&!teamMode&&editId)||crypto.randomUUID(),employee,...base};
+     const duplicate=state.entries.findIndex(x=>x.employee===employee&&x.date===entryDate);
+     const i=state.entries.findIndex(x=>x.id===entry.id);
+     if(i>=0)state.entries[i]=entry;
+     else if(duplicate>=0){entry.id=state.entries[duplicate].id;state.entries[duplicate]=entry}
+     else state.entries.push(entry);
+     saved.push(entry);
+   }
+ }
+
  persist();clearForm();renderMonth();renderRecap();
  try{
    await Promise.all(saved.map(pushEntry));
    setSyncStatus('Supabase synchronisé ✓');
-   alert(teamMode?`Journée enregistrée pour ${saved.length} salarié${saved.length>1?'s':''}.`:'Journée enregistrée et synchronisée.');
+   if(type==='CGE'&&dates.length>1){
+     alert(`${dates.length} jours de congés enregistrés pour ${employees.length} salarié${employees.length>1?'s':''}.`);
+   }else{
+     alert(teamMode?`Journée enregistrée pour ${saved.length} salarié${saved.length>1?'s':''}.`:'Journée enregistrée et synchronisée.');
+   }
  }catch(err){
    console.error(err);setSyncStatus('Enregistré localement — synchro en attente',false);
    alert('Journée enregistrée sur cet appareil. La synchronisation Supabase reprendra dès que possible.');
  }
 }
-function clearForm(){editId=null;el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
+function clearForm(){editId=null;if(el('leaveEnd'))el('leaveEnd').value='';el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
 function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
 async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
 function renderMonth(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));let totals={sup:0,route:0,real:0,ded:0};rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0});el('monthKpis').innerHTML=`<div class="kpi sup"><span>H sup chantier</span><b>${time(totals.sup)}</b></div><div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div><div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div><div class="kpi real"><span>H sup réelles</span><b>${time(totals.real)}</b></div>`;el('monthBody').innerHTML=rows.length?rows.map(e=>`<tr><td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td><td><span class="badge ${e.type}">${e.type}</span></td><td>${e.startOverride||state.settings[e.type]?.start||'—'}</td><td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td><td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td><td><b>${time(e.real)}</b></td><td>${esc(e.comment)}</td><td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`}
 function weekKey(date){const d=new Date(date+'T12:00:00');const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day+3);const first=new Date(d.getFullYear(),0,4);const firstDay=(first.getDay()+6)%7;first.setDate(first.getDate()-firstDay+3);const week=1+Math.round((d-first)/604800000);return d.getFullYear()+'-W'+String(week).padStart(2,'0')}
 function splitOvertime(rows){const cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};const limit=(Number(cfg.thresholdHours)||0)*60;const byWeek={};rows.forEach(e=>{const k=weekKey(e.date);(byWeek[k]||(byWeek[k]=[])).push(e)});let m1=0,m2=0;Object.values(byWeek).forEach(list=>{const total=list.reduce((a,e)=>a+(e.real||0),0);m1+=Math.min(total,limit);m2+=Math.max(0,total-limit)});return {m1,m2}}
 function money(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
-function renderRecap(){const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};el('recapBody').innerHTML=state.employees.map(emp=>{const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),count=t=>r.filter(e=>e.type===t).length,sp=splitOvertime(r),rate=Number(emp.rate)||0;const amount=(sp.m1/60)*rate*(1+Number(cfg.rate1||0)/100)+(sp.m2/60)*rate*(1+Number(cfg.rate2||0)/100);return `<tr><td><b>${esc(emp.name)}</b></td><td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td><td><b>${time(sum('real'))}</b></td><td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amount)}</b></td><td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td></tr>`}).join('')}
+function renderRecap(){const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};el('recapBody').innerHTML=state.employees.map(emp=>{const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),count=t=>r.filter(e=>e.type===t).length,sp=splitOvertime(r),rate=Number(emp.rate)||0;const amount=(sp.m1/60)*rate*(1+Number(cfg.rate1||0)/100)+(sp.m2/60)*rate*(1+Number(cfg.rate2||0)/100);return `<tr><td><b>${esc(emp.name)}</b></td><td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td><td><b>${time(sum('real'))}</b></td><td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amount)}</b></td><td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td></tr>`}).join('')}
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;renderEmployeeSettings();renderTeamSettings()}
 function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
 function removeEmployee(i){state.employees.splice(i,1);renderEmployeeSettings()}
@@ -464,7 +542,7 @@ async function saveTeams(){
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction','leaveEnd'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
 el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
