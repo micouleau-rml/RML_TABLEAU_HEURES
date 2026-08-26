@@ -118,9 +118,9 @@ header .wrap{position:relative;z-index:1}
 
 
 <style id="v146-form-conges">
-#leaveRange{display:none;margin-top:10px;padding:12px;border:1px solid #dbe7ff;background:#f4f8ff;border-radius:12px}
-#leaveRange.active{display:block}
-#leaveRange .hint{font-size:12px;color:#5f6b7a;margin-top:6px}
+#absenceRange{display:none;margin-top:10px;padding:12px;border:1px solid #dbe7ff;background:#f4f8ff;border-radius:12px}
+#absenceRange.active{display:block}
+#absenceRange .hint{font-size:12px;color:#5f6b7a;margin-top:6px}
 </style>
 
 </head>
@@ -165,8 +165,8 @@ header .wrap{position:relative;z-index:1}
    <div class="grid grid2">
     <div class="field"><label>Salarié</label><select id="employee"></select></div>
     <div class="field"><label>Date</label><input id="date" type="date"></div>
-   <div id="leaveRange">
-    <div class="field" style="margin:0"><label>Date de fin des congés</label><input id="leaveEnd" type="date"></div>
+   <div id="absenceRange">
+    <div class="field" style="margin:0"><label>Date de fin</label><input id="absenceEnd" type="date"></div>
     <div class="hint">Les samedis et dimanches sont ignorés automatiquement.</div>
    </div>
    </div>
@@ -258,7 +258,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.6 FORMATION + CONGÉS MULTI-DATES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.7 ABSENCES MULTI-DATES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -342,7 +342,7 @@ function calc(){
 
  el('timeFields').style.display=(absence||formation)?'none':'block';
  el('leaveRange')?.classList.toggle('active',type==='CGE');
- if(type!=='CGE'&&el('leaveEnd'))el('leaveEnd').value='';
+ if(type!=='CGE'&&el('absenceEnd'))el('absenceEnd').value='';
 
  if(absence){
    return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}
@@ -427,9 +427,9 @@ async function saveEntry(){
  if(!employees.length||!employees[0])return alert(teamMode?'Sélectionne au moins un salarié dans l’équipe.':'Choisis le salarié.');
 
  let dates=[date];
- if(type==='CGE'&&el('leaveEnd')?.value){
-   dates=workingDatesBetween(date,el('leaveEnd').value);
-   if(dates===null)return alert('La date de fin des congés doit être postérieure ou égale à la date de début.');
+ if(['CGE','MAL','AT'].includes(type)&&el('absenceEnd')?.value){
+   dates=workingDatesBetween(date,el('absenceEnd').value);
+   if(dates===null)return alert('La date de fin doit être postérieure ou égale à la date de début.');
    if(!dates.length)return alert('La période choisie ne contient aucun jour ouvré.');
  }
 
@@ -474,8 +474,9 @@ async function saveEntry(){
  try{
    await Promise.all(saved.map(pushEntry));
    setSyncStatus('Supabase synchronisé ✓');
-   if(type==='CGE'&&dates.length>1){
-     alert(`${dates.length} jours de congés enregistrés pour ${employees.length} salarié${employees.length>1?'s':''}.`);
+   if(['CGE','MAL','AT'].includes(type)&&dates.length>1){
+     const labels={CGE:'congés',MAL:'maladie',AT:'accident du travail'};
+     alert(`${dates.length} jours de ${labels[type]} enregistrés pour ${employees.length} salarié${employees.length>1?'s':''}.`);
    }else{
      alert(teamMode?`Journée enregistrée pour ${saved.length} salarié${saved.length>1?'s':''}.`:'Journée enregistrée et synchronisée.');
    }
@@ -484,7 +485,7 @@ async function saveEntry(){
    alert('Journée enregistrée sur cet appareil. La synchronisation Supabase reprendra dès que possible.');
  }
 }
-function clearForm(){editId=null;if(el('leaveEnd'))el('leaveEnd').value='';el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
+function clearForm(){editId=null;if(el('absenceEnd'))el('absenceEnd').value='';el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
 function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
 async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
 function renderMonth(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));let totals={sup:0,route:0,real:0,ded:0};rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0});el('monthKpis').innerHTML=`<div class="kpi sup"><span>H sup chantier</span><b>${time(totals.sup)}</b></div><div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div><div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div><div class="kpi real"><span>H sup réelles</span><b>${time(totals.real)}</b></div>`;el('monthBody').innerHTML=rows.length?rows.map(e=>`<tr><td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td><td><span class="badge ${e.type}">${e.type}</span></td><td>${e.startOverride||state.settings[e.type]?.start||'—'}</td><td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td><td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td><td><b>${time(e.real)}</b></td><td>${esc(e.comment)}</td><td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`}
@@ -542,7 +543,7 @@ async function saveTeams(){
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction','leaveEnd'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
 el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
