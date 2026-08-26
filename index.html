@@ -258,7 +258,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.8 MULTI-DATES CORRIGÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.9 MULTI-DATES ABSENCE + FORMATION</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -341,8 +341,8 @@ function calc(){
  const formation=type==='FORM';
 
  el('timeFields').style.display=(absence||formation)?'none':'block';
- el('absenceRange')?.classList.toggle('active',['CGE','MAL','AT'].includes(type));
- if(!['CGE','MAL','AT'].includes(type)&&el('absenceEnd'))el('absenceEnd').value='';
+ el('absenceRange')?.classList.toggle('active',['ABS','CGE','MAL','AT','FORM'].includes(type));
+ if(!['ABS','CGE','MAL','AT','FORM'].includes(type)&&el('absenceEnd'))el('absenceEnd').value='';
 
  if(absence){
    return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}
@@ -427,7 +427,7 @@ async function saveEntry(){
  if(!employees.length||!employees[0])return alert(teamMode?'Sélectionne au moins un salarié dans l’équipe.':'Choisis le salarié.');
 
  let dates=[date];
- if(['CGE','MAL','AT'].includes(type)&&el('absenceEnd')?.value){
+ if(['ABS','CGE','MAL','AT','FORM'].includes(type)&&el('absenceEnd')?.value){
    dates=workingDatesBetween(date,el('absenceEnd').value);
    if(dates===null)return alert('La date de fin doit être postérieure ou égale à la date de début.');
    if(!dates.length)return alert('La période choisie ne contient aucun jour ouvré.');
@@ -474,8 +474,8 @@ async function saveEntry(){
  try{
    await Promise.all(saved.map(pushEntry));
    setSyncStatus('Supabase synchronisé ✓');
-   if(['CGE','MAL','AT'].includes(type)&&dates.length>1){
-     const labels={CGE:'congés',MAL:'maladie',AT:'accident du travail'};
+   if(['ABS','CGE','MAL','AT','FORM'].includes(type)&&dates.length>1){
+     const labels={ABS:'absence',CGE:'congés',MAL:'maladie',AT:'accident du travail',FORM:'formation'};
      alert(`${dates.length} jours de ${labels[type]} enregistrés pour ${employees.length} salarié${employees.length>1?'s':''}.`);
    }else{
      alert(teamMode?`Journée enregistrée pour ${saved.length} salarié${saved.length>1?'s':''}.`:'Journée enregistrée et synchronisée.');
