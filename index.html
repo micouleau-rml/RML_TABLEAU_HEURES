@@ -258,7 +258,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.7 ABSENCES MULTI-DATES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.4.8 MULTI-DATES CORRIGÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -341,8 +341,8 @@ function calc(){
  const formation=type==='FORM';
 
  el('timeFields').style.display=(absence||formation)?'none':'block';
- el('leaveRange')?.classList.toggle('active',type==='CGE');
- if(type!=='CGE'&&el('absenceEnd'))el('absenceEnd').value='';
+ el('absenceRange')?.classList.toggle('active',['CGE','MAL','AT'].includes(type));
+ if(!['CGE','MAL','AT'].includes(type)&&el('absenceEnd'))el('absenceEnd').value='';
 
  if(absence){
    return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}
@@ -543,7 +543,9 @@ async function saveTeams(){
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','type','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id).addEventListener('input',updateCalc));el('saveBtn').onclick=saveEntry;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
+el('type')?.addEventListener('input',updateCalc);
+el('type')?.addEventListener('change',updateCalc);el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
 el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
