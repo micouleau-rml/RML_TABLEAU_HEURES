@@ -254,6 +254,32 @@ header .wrap{position:relative;z-index:1}
 .report-row strong{color:#9a3412}
 .report-month-note{font-size:11px;color:#9a3412;font-weight:700}
 </style>
+
+<style id="v166-json-backup">
+.backup-card{
+  margin-top:18px;
+  padding-top:18px;
+  border-top:1px solid #e2e7ef;
+}
+.backup-card h3{margin:0 0 6px}
+.backup-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:12px;
+}
+.backup-actions button{flex:1;min-width:220px}
+.backup-note{
+  margin-top:10px;
+  font-size:12px;
+  color:#667085;
+  line-height:1.4;
+}
+@media(max-width:700px){
+  .backup-actions button{width:100%;min-width:0}
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -407,9 +433,22 @@ header .wrap{position:relative;z-index:1}
  </div>
 </div></div>
  </div>
+
+<div class="backup-card">
+  <h3>Sauvegarde complète</h3>
+  <div class="muted">Crée une copie JSON complète de l'application pour pouvoir tout restaurer en cas de problème de synchronisation.</div>
+  <div class="backup-actions">
+    <button type="button" class="secondary" id="exportFullBackup">Exporter sauvegarde JSON</button>
+    <button type="button" class="primary" id="importFullBackup">Restaurer sauvegarde JSON</button>
+    <input type="file" id="importBackupFile" accept=".json,application/json" style="display:none">
+  </div>
+  <div class="backup-note">
+    La sauvegarde contient les salariés, taux horaires, réglages, équipes, journées saisies, reports d'heures et paramètres de l'application.
+  </div>
+</div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.5 REPORT SIMPLIFIÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.6 SAUVEGARDE JSON</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1100,6 +1139,116 @@ async function saveTeams(){
  catch(err){console.error(err);setSyncStatus('Équipes sauvegardées localement',false);alert('Équipes enregistrées localement.')}
 }
 
+
+function buildFullBackup(){
+ return {
+  app:'RML_HEURES',
+  formatVersion:1,
+  exportedAt:new Date().toISOString(),
+  data:{
+   employees:state.employees||[],
+   entries:state.entries||[],
+   settings:state.settings||{}
+  }
+ }
+}
+
+function exportFullBackup(){
+ try{
+  const backup=buildFullBackup();
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const d=new Date();
+  const stamp=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+'h'+String(d.getMinutes()).padStart(2,'0');
+  a.href=url;
+  a.download='RML_HEURES_SAUVEGARDE_'+stamp+'.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }catch(err){
+  console.error(err);
+  alert('Impossible de créer la sauvegarde JSON.');
+ }
+}
+
+function validateBackup(obj){
+ if(!obj||typeof obj!=='object')return false;
+ if(obj.app!=='RML_HEURES')return false;
+ if(!obj.data||typeof obj.data!=='object')return false;
+ if(!Array.isArray(obj.data.employees))return false;
+ if(!Array.isArray(obj.data.entries))return false;
+ if(!obj.data.settings||typeof obj.data.settings!=='object')return false;
+ return true;
+}
+
+async function restoreFullBackup(file){
+ try{
+  const text=await file.text();
+  const backup=JSON.parse(text);
+
+  if(!validateBackup(backup)){
+   alert('Ce fichier ne correspond pas à une sauvegarde complète RML HEURES.');
+   return;
+  }
+
+  const ok=confirm(
+   'Restaurer cette sauvegarde complète ?\n\n'+
+   'Date de sauvegarde : '+(backup.exportedAt?new Date(backup.exportedAt).toLocaleString('fr-FR'):'inconnue')+
+   '\n\nLes données locales actuelles seront remplacées.'
+  );
+  if(!ok)return;
+
+  state.employees=backup.data.employees;
+  state.entries=backup.data.entries;
+  state.settings=normalizeSettings(backup.data.settings);
+
+  persist();
+  options();
+  renderSettings();
+  renderTeamPicker();
+  renderMonth();
+  renderRecap();
+  updateCalc();
+
+  try{
+   // Synchronise la restauration vers Supabase pour remettre tous les appareils au même état.
+   await pushSettings();
+
+   // Remplacement complet des salariés côté Supabase
+   await db.from('rml_heures_employees').delete().neq('id',0);
+   if(state.employees.length){
+    const empRows=state.employees.map(e=>({
+     name:e.name,
+     hourly_rate:Number(e.rate)||0,
+     active:true,
+     updated_at:new Date().toISOString()
+    }));
+    const er=await db.from('rml_heures_employees').insert(empRows);
+    if(er.error)throw er.error;
+   }
+
+   // Remplacement complet des journées côté Supabase
+   await db.from('rml_heures_entries').delete().neq('id',0);
+   for(const e of state.entries){
+    await pushEntry(e);
+   }
+
+   setSyncStatus('Sauvegarde restaurée et synchronisée ✓');
+   alert('Sauvegarde restaurée complètement et synchronisée avec Supabase.');
+  }catch(syncErr){
+   console.error(syncErr);
+   setSyncStatus('Sauvegarde restaurée localement — synchro incomplète',false);
+   alert('La sauvegarde a été restaurée sur cet appareil, mais la synchronisation Supabase n’a pas pu être terminée.');
+  }
+
+ }catch(err){
+  console.error(err);
+  alert('Impossible de lire ou restaurer ce fichier JSON.');
+ }
+}
+
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
@@ -1107,7 +1256,14 @@ el('type')?.addEventListener('input',updateCalc);
 el('type')?.addEventListener('change',updateCalc);el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
-el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=()=>{if(el('globalReportDate'))el('globalReportDate').value='';renderRecap()};el('saveReports').onclick=saveReports;el('applyGlobalReportDate').onclick=applyGlobalReportDate;el('clearGlobalReportDate').onclick=clearGlobalReportDate;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
+el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=()=>{if(el('globalReportDate'))el('globalReportDate').value='';renderRecap()};el('saveReports').onclick=saveReports;el('applyGlobalReportDate').onclick=applyGlobalReportDate;el('clearGlobalReportDate').onclick=clearGlobalReportDate;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;
+el('exportFullBackup').onclick=exportFullBackup;
+el('importFullBackup').onclick=()=>el('importBackupFile').click();
+el('importBackupFile').onchange=e=>{
+ const file=e.target.files?.[0];
+ if(file)restoreFullBackup(file);
+ e.target.value='';
+};el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
 if(el('toggleTeamSettings')){
  el('toggleTeamSettings').onclick=()=>{
   const p=el('teamSettingsPanel');
