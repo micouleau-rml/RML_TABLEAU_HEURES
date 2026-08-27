@@ -393,7 +393,7 @@ header .wrap{position:relative;z-index:1}
    </div>
    <div class="table-wrap">
     <table>
-     <thead><tr><th>Salarié</th><th id="reportPrevHead">Report précédent</th><th id="reportCurrentHead">H sup du mois</th><th>Date de début du report</th><th>Total à payer ce mois</th><th id="reportNextHead">Heures à reporter</th></tr></thead>
+     <thead><tr><th>Salarié</th><th id="reportPrevHead">Report précédent</th><th id="reportCurrentHead">H sup du mois</th><th>Date de début du report</th><th>H avant la date</th><th>H à partir de la date</th><th>Total à payer ce mois</th><th id="reportNextHead">Heures à reporter</th></tr></thead>
      <tbody id="reportBody"></tbody>
     </table>
    </div>
@@ -448,7 +448,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.6 SAUVEGARDE JSON</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.7 REPORT CORRIGÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -855,19 +855,29 @@ function renderReports(){
    let cutoff=rec?.cutoffDate||'';
    if(cutoff&&!validCutoffForMonth(cutoff,ym))cutoff='';
 
-   const before=cutoff?acquiredMinutesBefore(emp.name,ym,cutoff):earned;
-   const after=cutoff?acquiredMinutesFrom(emp.name,ym,cutoff):0;
-   const payable=incoming+before;
+   // Logique métier :
+   // le report du mois précédent est payé sur le mois affiché.
+   // Il apparaît dans "H à partir de la date".
+   const hoursBefore=0;
+   const hoursFromDate=incoming;
+
+   // Les heures du mois affiché situées à partir de sa propre date de coupure
+   // constituent, elles, le nouveau report vers le mois suivant.
+   const outgoing=cutoff?acquiredMinutesFrom(emp.name,ym,cutoff):0;
+   const currentPaid=Math.max(0,earned-outgoing);
+   const payable=incoming+currentPaid;
 
    return `<tr>
     <td><b>${esc(emp.name)}</b></td>
     <td>${time(incoming)}${incoming>0?`<div class="muted" style="font-size:11px">payé en ${monthLabelFr(ym)}</div>`:''}</td>
     <td>${time(earned)}</td>
     <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${cutoff}"></td>
+    <td>${time(hoursBefore)}</td>
+    <td><b>${time(hoursFromDate)}</b></td>
     <td><b>${time(payable)}</b></td>
-    <td class="${after>0?'report-positive':'report-zero'}" data-report-carry="${esc(emp.name)}">
-      ${time(after)}
-      ${after>0?`<div class="muted" style="font-size:11px">vers ${monthLabelFr(nextYm)}</div>`:''}
+    <td class="${outgoing>0?'report-positive':'report-zero'}" data-report-carry="${esc(emp.name)}">
+      ${time(outgoing)}
+      ${outgoing>0?`<div class="muted" style="font-size:11px">vers ${monthLabelFr(nextYm)}</div>`:''}
     </td>
    </tr>`
  }).join('');
@@ -880,15 +890,15 @@ function renderReports(){
      const cutoff=inp.value;
      const incoming=carryInto(emp,ym);
      const earned=acquiredMinutes(emp,ym);
-     const before=cutoff?acquiredMinutesBefore(emp,ym,cutoff):earned;
-     const after=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
-     const payable=incoming+before;
-
+     const outgoing=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
+     const payable=incoming+Math.max(0,earned-outgoing);
      const row=inp.closest('tr');
      if(row){
-       row.children[4].innerHTML='<b>'+time(payable)+'</b>';
-       row.children[5].className=after>0?'report-positive':'report-zero';
-       row.children[5].innerHTML=time(after)+(after>0?`<div class="muted" style="font-size:11px">vers ${monthLabelFr(nextYm)}</div>`:'');
+       row.children[4].textContent=time(0);
+       row.children[5].innerHTML='<b>'+time(incoming)+'</b>';
+       row.children[6].innerHTML='<b>'+time(payable)+'</b>';
+       row.children[7].className=outgoing>0?'report-positive':'report-zero';
+       row.children[7].innerHTML=time(outgoing)+(outgoing>0?`<div class="muted" style="font-size:11px">vers ${monthLabelFr(nextYm)}</div>`:'');
      }
    })
  });
