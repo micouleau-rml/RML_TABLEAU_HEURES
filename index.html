@@ -356,10 +356,10 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">Indique la date à partir de laquelle les heures supplémentaires doivent être reportées. Seules les heures sont reportées : les paniers restent intégralement comptabilisés et réglés sur leur mois de travail. Les heures transmises/payées restent modifiables manuellement.</p>
+   <p class="report-help">Les heures reportées du mois précédent sont obligatoirement payées ce mois-ci et ne peuvent jamais être reportées une seconde fois. La date de report s’applique uniquement aux heures du mois courant. Les paniers restent payés sur leur mois de travail.</p>
    <div class="global-report-date no-print">
     <div class="field">
-      <label>Date de début du report (mois courant ou précédent)</label>
+      <label>Date de début du report pour tout le monde</label>
       <input type="date" id="globalReportDate">
     </div>
     <button type="button" class="secondary" id="applyGlobalReportDate">Appliquer à tous</button>
@@ -367,7 +367,7 @@ header .wrap{position:relative;z-index:1}
    </div>
    <div class="table-wrap">
     <table>
-     <thead><tr><th>Salarié</th><th id="reportPrevHead">Report précédent</th><th id="reportCurrentHead">H sup du mois</th><th>Date de début du report</th><th>H avant la date</th><th>H à partir de la date</th><th>Total disponible</th><th>Heures transmises / payées</th><th id="reportNextHead">Report suivant</th></tr></thead>
+     <thead><tr><th>Salarié</th><th id="reportPrevHead">Report précédent</th><th id="reportCurrentHead">H sup du mois</th><th>Date de début du report</th><th>H avant la date</th><th>H à partir de la date</th><th>Total à payer ce mois</th><th>Heures payées ce mois</th><th id="reportNextHead">Report suivant</th></tr></thead>
      <tbody id="reportBody"></tbody>
     </table>
    </div>
@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.7 REPORT INTÉGRÉ AU MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.8 REPORT SANS SAUT DE MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -647,77 +647,18 @@ function panierForEntry(e){return ['CONT','CLA','SAM','FORM'].includes(e?.type)?
 function incomingReportRows(employee,ym){
  const prevYm=previousMonth(ym);
  const rec=reportRecord(prevYm,employee);
- if(!rec)return [];
- const cutoff=rec.cutoffDate||'';
- const openingPrev=carryInto(employee,prevYm);
- const prevRows=state.entries
-   .filter(e=>e.employee===employee&&e.date&&e.date.startsWith(prevYm))
-   .sort((a,b)=>a.date.localeCompare(b.date));
-
- // Cas principal : report défini par une date de coupure.
- if(cutoff&&validCutoffForMonth(cutoff,prevYm)){
-   const rows=prevRows.filter(e=>e.date>=cutoff&&(Number(e.real)||0)>0)
-     .map(e=>({...e,_reportSource:true}));
-   const rowsTotal=rows.reduce((a,e)=>a+(Number(e.real)||0),0);
-   const expected=carryInto(employee,ym);
-
-   // Si un ajustement manuel "heures transmises" réduit le report,
-   // on tronque les lignes depuis la fin pour coller au solde réellement reporté.
-   let remaining=Math.max(0,expected);
-   const kept=[];
-   for(const e of rows){
-     if(remaining<=0)break;
-     const minsVal=Math.min(Number(e.real)||0,remaining);
-     if(minsVal>0)kept.push({...e,real:minsVal,sup:minsVal,_reportSource:true});
-     remaining-=minsVal;
-   }
-
-   // Un éventuel ancien report antérieur non représenté par les journées du mois précédent
-   // est ajouté sous forme d'une ligne synthétique.
-   if(remaining>0){
-     kept.unshift({
-       id:'incoming-old-'+employee+'-'+ym,
-       employee,
-       date:prevYm+'-01',
-       type:'REPORT',
-       real:remaining,
-       sup:remaining,
-       route:0,
-       deduction:'00:00',
-       comment:'Solde reporté antérieurement',
-       _reportSource:true
-     });
-   }
-   return kept;
- }
-
- // Sans date de coupure, mais avec un report manuel enregistré :
- const expected=carryInto(employee,ym);
- if(expected>0){
-   return [{
-     id:'incoming-'+employee+'-'+ym,
-     employee,
-     date:prevYm+'-01',
-     type:'REPORT',
-     real:expected,
-     sup:expected,
-     route:0,
-     deduction:'00:00',
-     comment:'Report du mois précédent',
-     _reportSource:true
-   }];
- }
- return [];
+ const cutoff=rec?.cutoffDate||'';
+ if(!cutoff||!validCutoffForMonth(cutoff,prevYm))return [];
+ return state.entries
+  .filter(e=>e.employee===employee&&e.date&&e.date.startsWith(prevYm)&&e.date>=cutoff&&(Number(e.real)||0)>0)
+  .sort((a,b)=>a.date.localeCompare(b.date))
+  .map(e=>({...e,_reportSource:true}));
 }
-
 function carryOut(employee,ym){
- const opening=carryInto(employee,ym);
- const earned=acquiredMinutes(employee,ym);
- const available=Math.max(0,opening+earned);
  const rec=reportRecord(ym,employee);
- if(!rec)return 0;
- const paid=Math.max(0,Math.min(available,Number(rec.paidMinutes)||0));
- return Math.max(0,available-paid)
+ const cutoff=rec?.cutoffDate||'';
+ if(!cutoff||!validCutoffForMonth(cutoff,ym))return 0;
+ return acquiredMinutesFrom(employee,ym,cutoff);
 }
 function entryReportedMinutes(e,ym,employee){
  const rec=reportRecord(ym,employee);
@@ -738,74 +679,58 @@ function renderMonth(){
  const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));
  const incomingRows=incomingReportRows(emp,ym);
  const opening=incomingRows.reduce((a,e)=>a+(Number(e.real)||0),0);
-
  let totals={sup:0,route:0,real:0,ded:0,paniers:0};
- rows.forEach(e=>{
-   totals.sup+=e.sup||0;
-   totals.route+=e.route||0;
-   totals.real+=e.real||0;
-   totals.ded+=mins(e.deduction)||0;
-   totals.paniers+=panierForEntry(e)
- });
-
+ rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0;totals.paniers+=panierForEntry(e)});
  const employee=state.employees.find(x=>x.name===emp);
  const rate=Number(employee?.rate)||0;
- const outgoing=carryOut(emp,ym);
-
- // Les heures reportées du mois précédent sont ajoutées aux heures à traiter ce mois.
- // On conserve leurs dates d'origine afin de préserver leur répartition hebdomadaire 10% / 25%.
- const payableRows=[...incomingRows,...rows];
+ const rec=reportRecord(ym,emp);
+ const cutoff=(rec?.cutoffDate&&validCutoffForMonth(rec.cutoffDate,ym))?rec.cutoffDate:'';
+ const currentPayableRows=cutoff?rows.filter(e=>e.date<cutoff):rows;
+ const currentReportedRows=cutoff?rows.filter(e=>e.date>=cutoff):[];
+ const currentPayable=currentPayableRows.reduce((a,e)=>a+(Number(e.real)||0),0);
+ const outgoing=currentReportedRows.reduce((a,e)=>a+(Number(e.real)||0),0);
+ const payableRows=[...incomingRows,...currentPayableRows];
  const amounts=overtimeAmounts(payableRows,rate);
  const cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};
 
  el('monthKpis').innerHTML=`
-   <div class="kpi sup"><span>H sup du mois</span><b>${time(totals.sup)}</b></div>
-   <div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div>
-   <div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div>
-   <div class="kpi real"><span>H sup réelles du mois</span><b>${time(totals.real)}</b></div>
-   <div class="kpi"><span>Report de ${monthLabelFr(previousMonth(ym))}</span><b>${time(opening)}</b></div>
-   <div class="kpi"><span>Total heures à traiter</span><b>${time(opening+totals.real)}</b></div>
-   <div class="kpi"><span>Report vers ${monthLabelFr(nextMonth(ym))}</span><b>${time(outgoing)}</b></div>
-   <div class="kpi"><span>HC ${cfg.rate1}% à traiter</span><b>${time(amounts.sp.m1)}</b><small>${money(amounts.amount10)}</small></div>
-   <div class="kpi"><span>HC ${cfg.rate2}% à traiter</span><b>${time(amounts.sp.m2)}</b><small>${money(amounts.amount25)}</small></div>
-   <div class="kpi"><span>Paniers du mois</span><b>${totals.paniers}</b></div>`;
+  <div class="kpi"><span>Report de ${monthLabelFr(previousMonth(ym))}</span><b>${time(opening)}</b></div>
+  <div class="kpi real"><span>H sup réelles de ${monthLabelFr(ym)}</span><b>${time(totals.real)}</b></div>
+  <div class="kpi"><span>H du mois payées maintenant</span><b>${time(currentPayable)}</b></div>
+  <div class="kpi"><span>Total heures payées ce mois</span><b>${time(opening+currentPayable)}</b></div>
+  <div class="kpi"><span>Report vers ${monthLabelFr(nextMonth(ym))}</span><b>${time(outgoing)}</b></div>
+  <div class="kpi"><span>HC ${cfg.rate1}% payées</span><b>${time(amounts.sp.m1)}</b><small>${money(amounts.amount10)}</small></div>
+  <div class="kpi"><span>HC ${cfg.rate2}% payées</span><b>${time(amounts.sp.m2)}</b><small>${money(amounts.amount25)}</small></div>
+  <div class="kpi"><span>Paniers du mois</span><b>${totals.paniers}</b></div>`;
 
  let reportRow='';
  if(opening>0){
-   const prevRec=reportRecord(previousMonth(ym),emp);
-   const cutoff=prevRec?.cutoffDate||'';
-   reportRow=`<tr class="report-row">
-     <td>${cutoff?new Date(cutoff+'T12:00').toLocaleDateString('fr-FR'):'—'}</td>
-     <td><strong>REPORT</strong></td>
-     <td colspan="6"><strong>Report de ${monthLabelFr(previousMonth(ym))}</strong>${cutoff?`<div class="report-month-note">heures effectuées à partir du ${new Date(cutoff+'T12:00').toLocaleDateString('fr-FR')}</div>`:''}</td>
-     <td><strong>${time(opening)}</strong></td>
-     <td>—</td>
-     <td>—</td>
-     <td>Heures reportées du mois précédent</td>
-     <td></td>
-   </tr>`;
+  const prevRec=reportRecord(previousMonth(ym),emp);
+  const prevCutoff=prevRec?.cutoffDate||'';
+  reportRow=`<tr class="report-row">
+   <td>${prevCutoff?new Date(prevCutoff+'T12:00').toLocaleDateString('fr-FR'):'—'}</td>
+   <td><strong>REPORT</strong></td>
+   <td colspan="6"><strong>Heures reportées de ${monthLabelFr(previousMonth(ym))}</strong>${prevCutoff?`<div class="report-month-note">à partir du ${new Date(prevCutoff+'T12:00').toLocaleDateString('fr-FR')} — payées en ${monthLabelFr(ym)}</div>`:''}</td>
+   <td><strong>${time(opening)}</strong></td>
+   <td>—</td><td>—</td><td>Payées ce mois</td><td></td>
+  </tr>`;
  }
-
  const normalRows=rows.map(e=>{
-   const reportMin=entryReportedMinutes(e,ym,emp);
-   return `<tr>
-    <td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td>
-    <td><span class="badge ${e.type}">${e.type}</span></td>
-    <td>${e.startOverride||state.settings[e.type]?.start||'—'}</td>
-    <td>${e.depart||'—'}</td>
-    <td>${e.arrivee||'—'}</td>
-    <td>${time(e.sup)}</td>
-    <td>${time(e.route)}</td>
-    <td>${e.deduction||'00:00'}</td>
-    <td><b>${time(e.real)}</b></td>
-    <td class="${reportMin>0?'reported-hours':'not-reported'}">${reportMin>0?time(reportMin):'—'}</td>
-    <td><span class="panier-pill">${panierForEntry(e)}</span></td>
-    <td>${esc(e.comment)}</td>
-    <td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td>
-   </tr>`
+  const reportMin=(cutoff&&e.date>=cutoff)?(Number(e.real)||0):0;
+  return `<tr>
+   <td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td>
+   <td><span class="badge ${e.type}">${e.type}</span></td>
+   <td>${e.startOverride||state.settings[e.type]?.start||'—'}</td>
+   <td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td>
+   <td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td>
+   <td><b>${time(e.real)}</b></td>
+   <td class="${reportMin>0?'reported-hours':'not-reported'}">${reportMin>0?time(reportMin):'—'}</td>
+   <td><span class="panier-pill">${panierForEntry(e)}</span></td>
+   <td>${esc(e.comment)}</td>
+   <td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td>
+  </tr>`
  }).join('');
-
- el('monthBody').innerHTML=(reportRow+normalRows) || `<tr><td colspan="13" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`;
+ el('monthBody').innerHTML=(reportRow+normalRows)||`<tr><td colspan="13" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`;
 }
 function weekKey(date){const d=new Date(date+'T12:00:00');const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day+3);const first=new Date(d.getFullYear(),0,4);const firstDay=(first.getDay()+6)%7;first.setDate(first.getDate()-firstDay+3);const week=1+Math.round((d-first)/604800000);return d.getFullYear()+'-W'+String(week).padStart(2,'0')}
 function splitOvertime(rows){const cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};const limit=(Number(cfg.thresholdHours)||0)*60;const byWeek={};rows.forEach(e=>{const k=weekKey(e.date);(byWeek[k]||(byWeek[k]=[])).push(e)});let m1=0,m2=0;Object.values(byWeek).forEach(list=>{const total=list.reduce((a,e)=>a+(e.real||0),0);m1+=Math.min(total,limit);m2+=Math.max(0,total-limit)});return {m1,m2}}
@@ -847,23 +772,14 @@ function reportRecord(ym,employee){
  const month=state.settings.monthlyReports[ym]||{};
  return month[employee]||null
 }
-function carryInto(employee,ym,guard=0){
- if(!ym||guard>240)return 0;
+function carryInto(employee,ym){
+ if(!ym)return 0;
  const prev=previousMonth(ym);
  if(!prev)return 0;
-
- const prevRecord=reportRecord(prev,employee);
- if(!prevRecord){
-   // Aucun choix de report enregistré sur le mois précédent :
-   // on considère que toutes les heures de ce mois ont été transmises/payées.
-   return 0;
- }
-
- const opening=carryInto(employee,prev,guard+1);
- const earned=acquiredMinutes(employee,prev);
- const available=Math.max(0,opening+earned);
- const paid=Math.max(0,Math.min(available,Number(prevRecord.paidMinutes)||0));
- return Math.max(0,available-paid)
+ const rec=reportRecord(prev,employee);
+ const cutoff=rec?.cutoffDate||'';
+ if(!cutoff||!validCutoffForMonth(cutoff,prev))return 0;
+ return acquiredMinutesFrom(employee,prev,cutoff);
 }
 function parseHoursInput(v){
  if(v==null||v==='')return 0;
@@ -887,115 +803,62 @@ function renderReports(){
  const ym=el('recapMonth')?.value;
  if(!el('reportBody')||!ym)return;
  const prevYm=previousMonth(ym),nextYm=nextMonth(ym);
- if(el('reportPrevHead'))el('reportPrevHead').textContent='Report de '+monthLabelFr(prevYm);
+ if(el('reportPrevHead'))el('reportPrevHead').textContent='Heures reportées de '+monthLabelFr(prevYm);
  if(el('reportCurrentHead'))el('reportCurrentHead').textContent='H sup de '+monthLabelFr(ym);
  if(el('reportNextHead'))el('reportNextHead').textContent='Report vers '+monthLabelFr(nextYm);
 
  el('reportBody').innerHTML=state.employees.map(emp=>{
-   const opening=carryInto(emp.name,ym);
-   const earned=acquiredMinutes(emp.name,ym);
-   const available=Math.max(0,opening+earned);
-   const rec=reportRecord(ym,emp.name);
-   let cutoff=rec?.cutoffDate||'';
-   if(cutoff&&!validCutoffForMonth(cutoff,ym))cutoff='';
-   const prevRec=reportRecord(previousMonth(ym),emp.name);
-   const incomingCutoff=prevRec?.cutoffDate||'';
-   const before=acquiredMinutesBefore(emp.name,ym,cutoff);
-   const from=cutoff?acquiredMinutesFrom(emp.name,ym,cutoff):0;
-   const paid=rec?Math.max(0,Math.min(available,Number(rec.paidMinutes)||0)):available;
-   const carry=Math.max(0,available-paid);
-   return `<tr>
-    <td><b>${esc(emp.name)}</b></td>
-    <td>${time(opening)}${incomingCutoff?`<div class="muted" style="font-size:11px">depuis le ${new Date(incomingCutoff+'T12:00').toLocaleDateString('fr-FR')}</div>`:''}</td>
-    <td>${time(earned)}</td>
-    <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${cutoff}"></td>
-    <td data-report-before="${esc(emp.name)}">${time(before)}</td>
-    <td data-report-from="${esc(emp.name)}"><b>${time(from)}</b></td>
-    <td><b>${time(available)}</b></td>
-    <td><input class="report-input" data-report-employee="${esc(emp.name)}" value="${hoursInputValue(paid)}" inputmode="decimal"></td>
-    <td class="${carry>0?'report-positive':'report-zero'}" data-report-carry="${esc(emp.name)}">${time(carry)}</td>
-   </tr>`
+  const incoming=carryInto(emp.name,ym);
+  const earned=acquiredMinutes(emp.name,ym);
+  const rec=reportRecord(ym,emp.name);
+  let cutoff=rec?.cutoffDate||'';
+  if(cutoff&&!validCutoffForMonth(cutoff,ym))cutoff='';
+  const before=cutoff?acquiredMinutesBefore(emp.name,ym,cutoff):earned;
+  const after=cutoff?acquiredMinutesFrom(emp.name,ym,cutoff):0;
+  const payable=incoming+before;
+  return `<tr>
+   <td><b>${esc(emp.name)}</b></td>
+   <td>${time(incoming)}${incoming>0?`<div class="muted" style="font-size:11px">payé en ${monthLabelFr(ym)}</div>`:''}</td>
+   <td>${time(earned)}</td>
+   <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${cutoff}"></td>
+   <td data-report-before="${esc(emp.name)}">${time(before)}</td>
+   <td data-report-from="${esc(emp.name)}"><b>${time(after)}</b></td>
+   <td><b>${time(payable)}</b></td>
+   <td><b>${time(payable)}</b></td>
+   <td class="${after>0?'report-positive':'report-zero'}" data-report-carry="${esc(emp.name)}">${time(after)}</td>
+  </tr>`
  }).join('');
 
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-   inp.addEventListener('change',()=>{
-     const emp=inp.dataset.reportCutoff,cutoff=inp.value;
-     const before=acquiredMinutesBefore(emp,ym,cutoff);
-     const from=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
-     const bc=Array.from(document.querySelectorAll('[data-report-before]')).find(x=>x.dataset.reportBefore===emp);
-     const fc=Array.from(document.querySelectorAll('[data-report-from]')).find(x=>x.dataset.reportFrom===emp);
-     if(bc)bc.textContent=time(before);
-     if(fc)fc.innerHTML='<b>'+time(from)+'</b>';
-
-     const opening=carryInto(emp,ym);
-     const available=Math.max(0,opening+acquiredMinutes(emp,ym));
-     const suggestedPaid=Math.max(0,Math.min(available,opening+before));
-     const pi=Array.from(document.querySelectorAll('[data-report-employee]')).find(x=>x.dataset.reportEmployee===emp);
-     if(pi)pi.value=hoursInputValue(suggestedPaid);
-     const carry=Math.max(0,available-suggestedPaid);
-     const cc=Array.from(document.querySelectorAll('[data-report-carry]')).find(x=>x.dataset.reportCarry===emp);
-     if(cc){cc.textContent=time(carry);cc.className=carry>0?'report-positive':'report-zero'}
-   })
- });
-
- document.querySelectorAll('[data-report-employee]').forEach(inp=>{
-   inp.addEventListener('input',()=>{
-     const emp=inp.dataset.reportEmployee;
-     const available=Math.max(0,carryInto(emp,ym)+acquiredMinutes(emp,ym));
-     const paid=Math.max(0,Math.min(available,parseHoursInput(inp.value)));
-     const carry=Math.max(0,available-paid);
-     const cc=Array.from(document.querySelectorAll('[data-report-carry]')).find(x=>x.dataset.reportCarry===emp);
-     if(cc){cc.textContent=time(carry);cc.className=carry>0?'report-positive':'report-zero'}
-   })
+  inp.addEventListener('change',()=>{
+   const emp=inp.dataset.reportCutoff;
+   const cutoff=inp.value;
+   const incoming=carryInto(emp,ym);
+   const earned=acquiredMinutes(emp,ym);
+   const before=cutoff?acquiredMinutesBefore(emp,ym,cutoff):earned;
+   const after=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
+   const payable=incoming+before;
+   const beforeCell=document.querySelector(`[data-report-before="${CSS.escape(emp)}"]`);
+   const fromCell=document.querySelector(`[data-report-from="${CSS.escape(emp)}"]`);
+   const paidInput=document.querySelector(`[data-report-employee="${CSS.escape(emp)}"]`);
+   const carryCell=document.querySelector(`[data-report-carry="${CSS.escape(emp)}"]`);
+   if(beforeCell)beforeCell.textContent=time(before);
+   if(fromCell)fromCell.innerHTML='<b>'+time(after)+'</b>';
+   if(paidInput)paidInput.value=hoursInputValue(payable);
+   if(carryCell){carryCell.textContent=time(after);carryCell.className=after>0?'report-positive':'report-zero'}
+  })
  })
 }
-
 function applyGlobalReportDate(){
  const ym=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
  if(!ym)return alert('Choisis le mois.');
- const prevYm=previousMonth(ym);
- if(date&&!validCutoffForMonth(date,ym)&&!validCutoffForMonth(date,prevYm)){
-   return alert('La date de report doit être comprise dans le mois sélectionné ou dans le mois précédent.');
+ if(date&&!validCutoffForMonth(date,ym)){
+  return alert('La date de report doit être comprise dans le mois sélectionné.');
  }
-
- // Si la date appartient au mois précédent, elle définit directement
- // le report entrant du mois affiché.
- if(date&&validCutoffForMonth(date,prevYm)){
-   state.settings.monthlyReports=state.settings.monthlyReports||{};
-   state.settings.monthlyReports[prevYm]=state.settings.monthlyReports[prevYm]||{};
-
-   state.employees.forEach(emp=>{
-     const earnedPrev=acquiredMinutes(emp.name,prevYm);
-     const openingPrev=carryInto(emp.name,prevYm);
-     const beforePrev=acquiredMinutesBefore(emp.name,prevYm,date);
-     const availablePrev=Math.max(0,openingPrev+earnedPrev);
-     const paidPrev=Math.max(0,Math.min(availablePrev,openingPrev+beforePrev));
-     state.settings.monthlyReports[prevYm][emp.name]={
-       paidMinutes:paidPrev,
-       cutoffDate:date,
-       updatedAt:new Date().toISOString()
-     };
-   });
-
-   persist();
-   renderRecap();
-   renderMonth();
-   pushSettings().then(()=>{
-     setSyncStatus('Supabase synchronisé ✓');
-     alert('Date appliquée au mois précédent : le report entrant du mois affiché a été recalculé.');
-   }).catch(err=>{
-     console.error(err);
-     setSyncStatus('Date enregistrée localement — synchro en attente',false);
-     alert('Date appliquée localement. La synchronisation Supabase reprendra dès que possible.');
-   });
-   return;
- }
-
- // Sinon, comportement normal sur le mois actuellement affiché.
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-   inp.value=date;
-   inp.dispatchEvent(new Event('change',{bubbles:true}));
+  inp.value=date;
+  inp.dispatchEvent(new Event('change',{bubbles:true}));
  });
 }
 function clearGlobalReportDate(){
@@ -1011,59 +874,51 @@ async function saveReports(){
  if(!ym)return alert('Choisis le mois.');
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[ym]=state.settings.monthlyReports[ym]||{};
-
  for(const emp of state.employees){
-   const paidInput=Array.from(document.querySelectorAll('[data-report-employee]')).find(x=>x.dataset.reportEmployee===emp.name);
-   const cutoffInput=Array.from(document.querySelectorAll('[data-report-cutoff]')).find(x=>x.dataset.reportCutoff===emp.name);
-   const opening=carryInto(emp.name,ym),earned=acquiredMinutes(emp.name,ym),available=Math.max(0,opening+earned);
-   const cutoffDate=cutoffInput?.value||'';
-   if(cutoffDate&&!validCutoffForMonth(cutoffDate,ym)){
-     alert(`La date de début du report de ${emp.name} doit être dans le mois sélectionné.`);
-     return;
-   }
-   const paid=Math.max(0,Math.min(available,parseHoursInput(paidInput?.value||'0')));
-   state.settings.monthlyReports[ym][emp.name]={paidMinutes:paid,cutoffDate,updatedAt:new Date().toISOString()};
+  const cutoffInput=document.querySelector(`[data-report-cutoff="${CSS.escape(emp.name)}"]`);
+  const cutoffDate=cutoffInput?.value||'';
+  if(cutoffDate&&!validCutoffForMonth(cutoffDate,ym)){
+   alert(`La date de début du report de ${emp.name} doit être dans le mois sélectionné.`);
+   return;
+  }
+  state.settings.monthlyReports[ym][emp.name]={cutoffDate,updatedAt:new Date().toISOString()};
  }
  persist();renderReports();renderMonth();
  try{
-   await pushSettings();
-   setSyncStatus('Supabase synchronisé ✓');
-   alert('Reports d’heures et dates de début enregistrés et synchronisés.');
+  await pushSettings();
+  setSyncStatus('Supabase synchronisé ✓');
+  alert('Dates de report enregistrées et synchronisées.');
  }catch(err){
-   console.error(err);setSyncStatus('Reports sauvegardés localement',false);
-   alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
+  console.error(err);setSyncStatus('Reports sauvegardés localement',false);
+  alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
  }
 }
-
 function renderRecap(){
  const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};
  el('recapBody').innerHTML=state.employees.map(emp=>{
-   const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));
-   const incoming=incomingReportRows(emp.name,ym);
-   const payable=[...incoming,...r];
-   const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),
-         ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),
-         count=t=>r.filter(e=>e.type===t).length,
-         paniers=r.reduce((a,e)=>a+panierForEntry(e),0),
-         rate=Number(emp.rate)||0;
-   const amounts=overtimeAmounts(payable,rate),sp=amounts.sp;
-   const opening=incoming.reduce((a,e)=>a+(Number(e.real)||0),0);
-   return `<tr>
-    <td><b>${esc(emp.name)}</b>${opening>0?`<div class="muted" style="font-size:11px">+ ${time(opening)} report</div>`:''}</td>
-    <td>${money(rate).replace(' €',' €/h')}</td>
-    <td>${r.length}</td>
-    <td><b>${paniers}</b></td>
-    <td>${time(sum('sup'))}</td>
-    <td>${time(sum('route'))}</td>
-    <td>${time(ded)}</td>
-    <td><b>${time(sum('real')+opening)}</b></td>
-    <td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td>
-    <td><b>${money(amounts.amount10)}</b></td>
-    <td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td>
-    <td><b>${money(amounts.amount25)}</b></td>
-    <td><b>${money(amounts.total)}</b></td>
-    <td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td>
-   </tr>`
+  const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));
+  const incoming=incomingReportRows(emp.name,ym);
+  const opening=incoming.reduce((a,e)=>a+(Number(e.real)||0),0);
+  const rec=reportRecord(ym,emp.name);
+  const cutoff=(rec?.cutoffDate&&validCutoffForMonth(rec.cutoffDate,ym))?rec.cutoffDate:'';
+  const currentPayable=cutoff?r.filter(e=>e.date<cutoff):r;
+  const currentReported=cutoff?r.filter(e=>e.date>=cutoff):[];
+  const payable=[...incoming,...currentPayable];
+  const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),
+        count=t=>r.filter(e=>e.type===t).length,paniers=r.reduce((a,e)=>a+panierForEntry(e),0),rate=Number(emp.rate)||0;
+  const amounts=overtimeAmounts(payable,rate),sp=amounts.sp;
+  const paidCurrent=currentPayable.reduce((a,e)=>a+(Number(e.real)||0),0);
+  const reportNext=currentReported.reduce((a,e)=>a+(Number(e.real)||0),0);
+  return `<tr>
+   <td><b>${esc(emp.name)}</b>${opening>0?`<div class="muted" style="font-size:11px">${time(opening)} de ${monthLabelFr(previousMonth(ym))} payé ce mois</div>`:''}</td>
+   <td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td><b>${paniers}</b></td>
+   <td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td>
+   <td><b>${time(opening+paidCurrent)}</b>${reportNext>0?`<div class="muted" style="font-size:11px">${time(reportNext)} reporté</div>`:''}</td>
+   <td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td><b>${money(amounts.amount10)}</b></td>
+   <td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amounts.amount25)}</b></td>
+   <td><b>${money(amounts.total)}</b></td>
+   <td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td>
+  </tr>`
  }).join('');
  renderReports()
 }
