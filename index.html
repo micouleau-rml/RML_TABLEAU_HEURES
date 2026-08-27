@@ -222,6 +222,28 @@ header .wrap{position:relative;z-index:1}
 .not-reported{color:#98a2b3}
 </style>
 
+
+<style id="v155-global-report-date">
+.global-report-date{
+  display:flex;
+  align-items:end;
+  gap:10px;
+  flex-wrap:wrap;
+  margin:12px 0 14px;
+  padding:12px;
+  border:1px solid #dbe7ff;
+  background:#f4f8ff;
+  border-radius:12px;
+}
+.global-report-date .field{margin:0;min-width:220px}
+.global-report-date button{white-space:nowrap}
+@media(max-width:700px){
+  .global-report-date{align-items:stretch}
+  .global-report-date .field{width:100%}
+  .global-report-date button{width:100%}
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -325,6 +347,14 @@ header .wrap{position:relative;z-index:1}
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
    <p class="report-help">Indique la date à partir de laquelle les heures supplémentaires doivent être reportées. Seules les heures sont reportées : les paniers restent intégralement comptabilisés et réglés sur leur mois de travail. Les heures transmises/payées restent modifiables manuellement.</p>
+   <div class="global-report-date no-print">
+    <div class="field">
+      <label>Date de début du report pour tout le monde</label>
+      <input type="date" id="globalReportDate">
+    </div>
+    <button type="button" class="secondary" id="applyGlobalReportDate">Appliquer à tous</button>
+    <button type="button" class="secondary" id="clearGlobalReportDate">Effacer pour tous</button>
+   </div>
    <div class="table-wrap">
     <table>
      <thead><tr><th>Salarié</th><th id="reportPrevHead">Report précédent</th><th id="reportCurrentHead">H sup du mois</th><th>Date de début du report</th><th>H avant la date</th><th>H à partir de la date</th><th>Total disponible</th><th>Heures transmises / payées</th><th id="reportNextHead">Report suivant</th></tr></thead>
@@ -369,7 +399,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.4 REPORT + MONTANTS HC</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.5 DATE DE REPORT GLOBALE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -815,6 +845,27 @@ function renderReports(){
    })
  })
 }
+
+function applyGlobalReportDate(){
+ const ym=el('recapMonth')?.value;
+ const date=el('globalReportDate')?.value||'';
+ if(!ym)return alert('Choisis le mois.');
+ if(date&&!validCutoffForMonth(date,ym)){
+   return alert('La date de report doit être comprise dans le mois sélectionné.');
+ }
+ document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+   inp.value=date;
+   inp.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+}
+function clearGlobalReportDate(){
+ if(el('globalReportDate'))el('globalReportDate').value='';
+ document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+   inp.value='';
+   inp.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+}
+
 async function saveReports(){
  const ym=el('recapMonth')?.value;
  if(!ym)return alert('Choisis le mois.');
@@ -928,7 +979,7 @@ el('type')?.addEventListener('input',updateCalc);
 el('type')?.addEventListener('change',updateCalc);el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
-el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveReports').onclick=saveReports;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
+el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=()=>{if(el('globalReportDate'))el('globalReportDate').value='';renderRecap()};el('saveReports').onclick=saveReports;el('applyGlobalReportDate').onclick=applyGlobalReportDate;el('clearGlobalReportDate').onclick=clearGlobalReportDate;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
 if(el('toggleTeamSettings')){
  el('toggleTeamSettings').onclick=()=>{
   const p=el('teamSettingsPanel');
