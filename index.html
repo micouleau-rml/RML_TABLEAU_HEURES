@@ -356,7 +356,7 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">Les heures reportées du mois précédent sont obligatoirement payées ce mois-ci et ne peuvent jamais être reportées une seconde fois. La date de report s’applique uniquement aux heures du mois courant. Les paniers restent payés sur leur mois de travail.</p>
+   <p class="report-help">Les heures reportées du mois précédent sont obligatoirement payées ce mois-ci et ne peuvent jamais être reportées une seconde fois. La date de report affichée correspond uniquement au mois sélectionné. Les paniers restent payés sur leur mois de travail.</p>
    <div class="global-report-date no-print">
     <div class="field">
       <label>Date de début du report pour tout le monde</label>
@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.8 REPORT SANS SAUT DE MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.9 DATE DE REPORT PAR MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -829,6 +829,8 @@ function renderReports(){
   </tr>`
  }).join('');
 
+ refreshGlobalReportDate();
+
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
   inp.addEventListener('change',()=>{
    const emp=inp.dataset.reportCutoff;
@@ -848,6 +850,16 @@ function renderReports(){
    if(carryCell){carryCell.textContent=time(after);carryCell.className=after>0?'report-positive':'report-zero'}
   })
  })
+}
+function refreshGlobalReportDate(){
+ const ym=el('recapMonth')?.value;
+ const input=el('globalReportDate');
+ if(!input||!ym)return;
+ const dates=state.employees.map(emp=>{
+  const d=reportRecord(ym,emp.name)?.cutoffDate||'';
+  return validCutoffForMonth(d,ym)?d:'';
+ }).filter(Boolean);
+ input.value=(dates.length===state.employees.length&&new Set(dates).size===1)?dates[0]:'';
 }
 function applyGlobalReportDate(){
  const ym=el('recapMonth')?.value;
