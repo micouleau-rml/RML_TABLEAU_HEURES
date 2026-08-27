@@ -123,6 +123,20 @@ header .wrap{position:relative;z-index:1}
 #absenceRange .hint{font-size:12px;color:#5f6b7a;margin-top:6px}
 </style>
 
+<style id="v149-paniers">
+.panier-pill{display:inline-flex;align-items:center;justify-content:center;min-width:34px;padding:4px 8px;border-radius:999px;background:#fff7ed;color:#9a3412;font-weight:800}
+</style>
+
+<style id="v150-report-hours">
+.report-card{margin-top:18px;border-top:1px solid #e4e9f2;padding-top:18px}
+.report-help{margin:0 0 12px;color:#667085;font-size:13px}
+.report-input{width:86px!important;min-width:86px;padding:7px 8px!important;text-align:center;font-weight:800}
+.report-positive{font-weight:900;color:#9a3412}
+.report-zero{font-weight:800;color:#166534}
+.report-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+@media(max-width:800px){.report-input{width:78px!important;min-width:78px}}
+</style>
+
 </head>
 <body>
 <header>
@@ -214,14 +228,26 @@ header .wrap{position:relative;z-index:1}
    <div class="field"><label>&nbsp;</label><button class="secondary" id="exportCsv">Exporter CSV</button></div>
   </div>
   <div id="monthKpis" class="kpis" style="margin-bottom:14px"></div>
-  <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Embauche</th><th>Départ</th><th>Arrivée</th><th>H sup</th><th>H route</th><th>Déduction</th><th>H sup réelles</th><th>Commentaire</th><th></th></tr></thead><tbody id="monthBody"></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Embauche</th><th>Départ</th><th>Arrivée</th><th>H sup</th><th>H route</th><th>Déduction</th><th>H sup réelles</th><th>Panier</th><th>Commentaire</th><th></th></tr></thead><tbody id="monthBody"></tbody></table></div>
  </div>
 </section>
 
 <section id="recap" class="view">
  <div class="card">
   <div class="grid grid2"><div class="field"><label>Mois</label><input id="recapMonth" type="month"></div><div class="field"><label>&nbsp;</label><button class="secondary" id="printRecap">Imprimer / PDF</button></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Salarié</th><th>Taux horaire</th><th>Jours saisis</th><th>H sup chantier</th><th>H route</th><th>Déductions</th><th>H sup réelles</th><th>HC 10%</th><th>HC 25%</th><th>Montant HC</th><th>ABS</th><th>MAL</th><th>AT</th><th>CGE</th><th>FORM</th></tr></thead><tbody id="recapBody"></tbody></table></div>
+  <div class="table-wrap"><table><thead><tr><th>Salarié</th><th>Taux horaire</th><th>Jours saisis</th><th>Paniers</th><th>H sup chantier</th><th>H route</th><th>Déductions</th><th>H sup réelles</th><th>HC 10%</th><th>HC 25%</th><th>Montant HC</th><th>ABS</th><th>MAL</th><th>AT</th><th>CGE</th><th>FORM</th></tr></thead><tbody id="recapBody"></tbody></table></div>
+
+  <div class="report-card">
+   <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
+   <p class="report-help">Par défaut, toutes les heures disponibles sont considérées comme transmises/payées. Si tu dois en reporter une partie, indique simplement les heures réellement transmises au comptable. Le solde sera repris automatiquement le mois suivant.</p>
+   <div class="table-wrap">
+    <table>
+     <thead><tr><th>Salarié</th><th>Report précédent</th><th>H sup du mois</th><th>Total disponible</th><th>Heures transmises / payées</th><th>Report suivant</th></tr></thead>
+     <tbody id="reportBody"></tbody>
+    </table>
+   </div>
+   <div class="report-actions"><button class="primary" id="saveReports">Enregistrer les reports</button></div>
+  </div>
  </div>
 </section>
 
@@ -258,7 +284,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.4.9 MULTI-DATES ABSENCE + FORMATION</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.0 REPORT D'HEURES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -279,7 +305,8 @@ function normalizeSettings(raw){
    CLA:{start:'07:15',end:'15:00',pauseStart:'12:15',pauseEnd:'13:00'},
    SAM:{start:'07:00',end:'14:00'},
    overtime:{rate1:10,rate2:25,thresholdHours:4},
-   teams:[]
+   teams:[],
+   monthlyReports:{}
  };
  const s=(raw&&typeof raw==='object')?raw:{};
  return {
@@ -289,7 +316,8 @@ function normalizeSettings(raw){
    CLA:{...base.CLA,...(s.CLA||{})},
    SAM:{...base.SAM,...(s.SAM||{})},
    overtime:{...base.overtime,...(s.overtime||{})},
-   teams:Array.isArray(s.teams)?s.teams:[]
+   teams:Array.isArray(s.teams)?s.teams:[],
+   monthlyReports:(s.monthlyReports&&typeof s.monthlyReports==='object')?s.monthlyReports:{}
  };
 }
 
@@ -341,8 +369,8 @@ function calc(){
  const formation=type==='FORM';
 
  el('timeFields').style.display=(absence||formation)?'none':'block';
- el('absenceRange')?.classList.toggle('active',['ABS','CGE','MAL','AT','FORM'].includes(type));
- if(!['ABS','CGE','MAL','AT','FORM'].includes(type)&&el('absenceEnd'))el('absenceEnd').value='';
+ el('absenceRange')?.classList.toggle('active',['CGE','MAL','AT'].includes(type));
+ if(!['CGE','MAL','AT'].includes(type)&&el('absenceEnd'))el('absenceEnd').value='';
 
  if(absence){
    return {sup:0,route:0,real:0,presence:0,start:null,normalEnd:null,ded:0,week:dayKind(date),shifted:false}
@@ -427,7 +455,7 @@ async function saveEntry(){
  if(!employees.length||!employees[0])return alert(teamMode?'Sélectionne au moins un salarié dans l’équipe.':'Choisis le salarié.');
 
  let dates=[date];
- if(['ABS','CGE','MAL','AT','FORM'].includes(type)&&el('absenceEnd')?.value){
+ if(['CGE','MAL','AT'].includes(type)&&el('absenceEnd')?.value){
    dates=workingDatesBetween(date,el('absenceEnd').value);
    if(dates===null)return alert('La date de fin doit être postérieure ou égale à la date de début.');
    if(!dates.length)return alert('La période choisie ne contient aucun jour ouvré.');
@@ -474,8 +502,8 @@ async function saveEntry(){
  try{
    await Promise.all(saved.map(pushEntry));
    setSyncStatus('Supabase synchronisé ✓');
-   if(['ABS','CGE','MAL','AT','FORM'].includes(type)&&dates.length>1){
-     const labels={ABS:'absence',CGE:'congés',MAL:'maladie',AT:'accident du travail',FORM:'formation'};
+   if(['CGE','MAL','AT'].includes(type)&&dates.length>1){
+     const labels={CGE:'congés',MAL:'maladie',AT:'accident du travail'};
      alert(`${dates.length} jours de ${labels[type]} enregistrés pour ${employees.length} salarié${employees.length>1?'s':''}.`);
    }else{
      alert(teamMode?`Journée enregistrée pour ${saved.length} salarié${saved.length>1?'s':''}.`:'Journée enregistrée et synchronisée.');
@@ -488,11 +516,125 @@ async function saveEntry(){
 function clearForm(){editId=null;if(el('absenceEnd'))el('absenceEnd').value='';el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
 function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
 async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
-function renderMonth(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));let totals={sup:0,route:0,real:0,ded:0};rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0});el('monthKpis').innerHTML=`<div class="kpi sup"><span>H sup chantier</span><b>${time(totals.sup)}</b></div><div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div><div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div><div class="kpi real"><span>H sup réelles</span><b>${time(totals.real)}</b></div>`;el('monthBody').innerHTML=rows.length?rows.map(e=>`<tr><td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td><td><span class="badge ${e.type}">${e.type}</span></td><td>${e.startOverride||state.settings[e.type]?.start||'—'}</td><td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td><td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td><td><b>${time(e.real)}</b></td><td>${esc(e.comment)}</td><td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td></tr>`).join(''):`<tr><td colspan="11" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`}
+function panierForEntry(e){return ['CONT','CLA','SAM','FORM'].includes(e?.type)?1:0}
+function renderMonth(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));let totals={sup:0,route:0,real:0,ded:0,paniers:0};rows.forEach(e=>{totals.sup+=e.sup||0;totals.route+=e.route||0;totals.real+=e.real||0;totals.ded+=mins(e.deduction)||0;totals.paniers+=panierForEntry(e)});el('monthKpis').innerHTML=`<div class="kpi sup"><span>H sup chantier</span><b>${time(totals.sup)}</b></div><div class="kpi route"><span>H route</span><b>${time(totals.route)}</b></div><div class="kpi"><span>Déductions</span><b>${time(totals.ded)}</b></div><div class="kpi real"><span>H sup réelles</span><b>${time(totals.real)}</b></div><div class="kpi"><span>Paniers du mois</span><b>${totals.paniers}</b></div>`;el('monthBody').innerHTML=rows.length?rows.map(e=>`<tr><td>${new Date(e.date+'T12:00').toLocaleDateString('fr-FR')}</td><td><span class="badge ${e.type}">${e.type}</span></td><td>${e.startOverride||state.settings[e.type]?.start||'—'}</td><td>${e.depart||'—'}</td><td>${e.arrivee||'—'}</td><td>${time(e.sup)}</td><td>${time(e.route)}</td><td>${e.deduction||'00:00'}</td><td><b>${time(e.real)}</b></td><td><span class="panier-pill">${panierForEntry(e)}</span></td><td>${esc(e.comment)}</td><td class="row-actions"><button onclick="editEntry('${e.id}')">✎</button> <button onclick="delEntry('${e.id}')">×</button></td></tr>`).join(''):`<tr><td colspan="12" class="empty">Aucune journée enregistrée pour ce mois.</td></tr>`}
 function weekKey(date){const d=new Date(date+'T12:00:00');const day=(d.getDay()+6)%7;d.setDate(d.getDate()-day+3);const first=new Date(d.getFullYear(),0,4);const firstDay=(first.getDay()+6)%7;first.setDate(first.getDate()-firstDay+3);const week=1+Math.round((d-first)/604800000);return d.getFullYear()+'-W'+String(week).padStart(2,'0')}
 function splitOvertime(rows){const cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};const limit=(Number(cfg.thresholdHours)||0)*60;const byWeek={};rows.forEach(e=>{const k=weekKey(e.date);(byWeek[k]||(byWeek[k]=[])).push(e)});let m1=0,m2=0;Object.values(byWeek).forEach(list=>{const total=list.reduce((a,e)=>a+(e.real||0),0);m1+=Math.min(total,limit);m2+=Math.max(0,total-limit)});return {m1,m2}}
 function money(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'}
-function renderRecap(){const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};el('recapBody').innerHTML=state.employees.map(emp=>{const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),count=t=>r.filter(e=>e.type===t).length,sp=splitOvertime(r),rate=Number(emp.rate)||0;const amount=(sp.m1/60)*rate*(1+Number(cfg.rate1||0)/100)+(sp.m2/60)*rate*(1+Number(cfg.rate2||0)/100);return `<tr><td><b>${esc(emp.name)}</b></td><td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td><td><b>${time(sum('real'))}</b></td><td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amount)}</b></td><td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td></tr>`}).join('')}
+
+function previousMonth(ym){
+ if(!ym)return '';
+ const [y,m]=ym.split('-').map(Number);
+ const d=new Date(y,m-2,1);
+ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')
+}
+function acquiredMinutes(employee,ym){
+ return state.entries
+   .filter(e=>e.employee===employee&&e.date&&e.date.startsWith(ym))
+   .reduce((a,e)=>a+(Number(e.real)||0),0)
+}
+function reportRecord(ym,employee){
+ state.settings.monthlyReports=state.settings.monthlyReports||{};
+ const month=state.settings.monthlyReports[ym]||{};
+ return month[employee]||null
+}
+function carryInto(employee,ym,guard=0){
+ if(!ym||guard>240)return 0;
+ const prev=previousMonth(ym);
+ if(!prev)return 0;
+
+ const prevRecord=reportRecord(prev,employee);
+ if(!prevRecord){
+   // Aucun choix de report enregistré sur le mois précédent :
+   // on considère que toutes les heures de ce mois ont été transmises/payées.
+   return 0;
+ }
+
+ const opening=carryInto(employee,prev,guard+1);
+ const earned=acquiredMinutes(employee,prev);
+ const available=Math.max(0,opening+earned);
+ const paid=Math.max(0,Math.min(available,Number(prevRecord.paidMinutes)||0));
+ return Math.max(0,available-paid)
+}
+function parseHoursInput(v){
+ if(v==null||v==='')return 0;
+ const s=String(v).trim().replace(',', '.');
+ if(/^\d+:\d{1,2}$/.test(s)){
+   const [h,m]=s.split(':').map(Number);
+   return Math.max(0,h*60+Math.min(59,m||0))
+ }
+ if(/^\d+h\d{0,2}$/i.test(s)){
+   const [h,m='0']=s.toLowerCase().split('h').map(Number);
+   return Math.max(0,h*60+Math.min(59,m||0))
+ }
+ const n=Number(s);
+ return Number.isFinite(n)?Math.max(0,Math.round(n*60)):0
+}
+function hoursInputValue(minutes){
+ minutes=Math.max(0,Math.round(Number(minutes)||0));
+ return Math.floor(minutes/60)+':'+String(minutes%60).padStart(2,'0')
+}
+function renderReports(){
+ const ym=el('recapMonth')?.value;
+ if(!el('reportBody')||!ym)return;
+ el('reportBody').innerHTML=state.employees.map(emp=>{
+   const opening=carryInto(emp.name,ym);
+   const earned=acquiredMinutes(emp.name,ym);
+   const available=Math.max(0,opening+earned);
+   const rec=reportRecord(ym,emp.name);
+   const paid=rec?Math.max(0,Math.min(available,Number(rec.paidMinutes)||0)):available;
+   const carry=Math.max(0,available-paid);
+   return `<tr>
+    <td><b>${esc(emp.name)}</b></td>
+    <td>${time(opening)}</td>
+    <td>${time(earned)}</td>
+    <td><b>${time(available)}</b></td>
+    <td><input class="report-input" data-report-employee="${esc(emp.name)}" value="${hoursInputValue(paid)}" inputmode="decimal" aria-label="Heures transmises pour ${esc(emp.name)}"></td>
+    <td class="${carry>0?'report-positive':'report-zero'}" data-report-carry="${esc(emp.name)}">${time(carry)}</td>
+   </tr>`
+ }).join('');
+
+ document.querySelectorAll('[data-report-employee]').forEach(inp=>{
+   inp.addEventListener('input',()=>{
+     const emp=inp.dataset.reportEmployee;
+     const opening=carryInto(emp,ym),earned=acquiredMinutes(emp,ym),available=Math.max(0,opening+earned);
+     const paid=Math.max(0,Math.min(available,parseHoursInput(inp.value)));
+     const carry=Math.max(0,available-paid);
+     const cell=Array.from(document.querySelectorAll('[data-report-carry]')).find(x=>x.dataset.reportCarry===emp);
+     if(cell){
+       cell.textContent=time(carry);
+       cell.className=carry>0?'report-positive':'report-zero';
+     }
+   })
+ })
+}
+async function saveReports(){
+ const ym=el('recapMonth')?.value;
+ if(!ym)return alert('Choisis le mois.');
+ state.settings.monthlyReports=state.settings.monthlyReports||{};
+ state.settings.monthlyReports[ym]=state.settings.monthlyReports[ym]||{};
+
+ document.querySelectorAll('[data-report-employee]').forEach(inp=>{
+   const emp=inp.dataset.reportEmployee;
+   const opening=carryInto(emp,ym),earned=acquiredMinutes(emp,ym),available=Math.max(0,opening+earned);
+   const paid=Math.max(0,Math.min(available,parseHoursInput(inp.value)));
+   state.settings.monthlyReports[ym][emp]={paidMinutes:paid,updatedAt:new Date().toISOString()};
+ });
+
+ persist();
+ renderReports();
+ try{
+   await pushSettings();
+   setSyncStatus('Supabase synchronisé ✓');
+   alert('Reports d’heures enregistrés et synchronisés.');
+ }catch(err){
+   console.error(err);
+   setSyncStatus('Reports sauvegardés localement',false);
+   alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
+ }
+}
+
+function renderRecap(){const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};el('recapBody').innerHTML=state.employees.map(emp=>{const r=state.entries.filter(e=>e.employee===emp.name&&e.date.startsWith(ym));const sum=k=>r.reduce((a,e)=>a+(e[k]||0),0),ded=r.reduce((a,e)=>a+(mins(e.deduction)||0),0),count=t=>r.filter(e=>e.type===t).length,paniers=r.reduce((a,e)=>a+panierForEntry(e),0),sp=splitOvertime(r),rate=Number(emp.rate)||0;const amount=(sp.m1/60)*rate*(1+Number(cfg.rate1||0)/100)+(sp.m2/60)*rate*(1+Number(cfg.rate2||0)/100);return `<tr><td><b>${esc(emp.name)}</b></td><td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td><b>${paniers}</b></td><td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td><td><b>${time(sum('real'))}</b></td><td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amount)}</b></td><td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td></tr>`}).join('');renderReports()}
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;renderEmployeeSettings();renderTeamSettings()}
 function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
 function removeEmployee(i){state.employees.splice(i,1);renderEmployeeSettings()}
@@ -548,7 +690,7 @@ el('type')?.addEventListener('input',updateCalc);
 el('type')?.addEventListener('change',updateCalc);el('saveBtn').onclick=saveEntry;
 el('singleModeBtn').onclick=()=>teamMode(false);
 el('teamModeBtn').onclick=()=>teamMode(true);
-el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
+el('teamPreset').onchange=applyTeamPreset;el('clearBtn').onclick=clearForm;el('monthEmployee').onchange=renderMonth;el('monthPick').onchange=renderMonth;el('recapMonth').onchange=renderRecap;el('saveReports').onclick=saveReports;el('saveSettings').onclick=saveSettings;el('saveEmployees').onclick=saveEmployees;el('addEmployee').onclick=addEmployee;el('addTeam').onclick=addTeam;el('saveTeams').onclick=saveTeams;
 if(el('toggleTeamSettings')){
  el('toggleTeamSettings').onclick=()=>{
   const p=el('teamSettingsPanel');
