@@ -137,6 +137,78 @@ header .wrap{position:relative;z-index:1}
 @media(max-width:800px){.report-input{width:78px!important;min-width:78px}}
 </style>
 
+
+<style id="v151-print">
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+
+  html, body {
+    background:#fff !important;
+    color:#000 !important;
+    width:100% !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+
+  header, nav, footer, .actions, button, .sync, #syncStatus, .no-print {
+    display:none !important;
+  }
+
+  main, .wrap, .container, section, .card, .panel {
+    width:100% !important;
+    max-width:none !important;
+    margin:0 !important;
+    padding:0 !important;
+    box-shadow:none !important;
+  }
+
+  .table-wrap {
+    width:100% !important;
+    overflow:visible !important;
+  }
+
+  table {
+    width:100% !important;
+    border-collapse:collapse !important;
+    font-size:8pt !important;
+  }
+
+  th, td {
+    padding:3px 4px !important;
+    white-space:normal !important;
+    overflow:visible !important;
+  }
+
+  th { font-size:7.5pt !important; }
+  tr { page-break-inside:avoid !important; }
+
+  .report-input {
+    border:0 !important;
+    background:transparent !important;
+    padding:0 !important;
+    width:60px !important;
+    min-width:0 !important;
+    font-size:8pt !important;
+  }
+
+  .panier-pill {
+    background:transparent !important;
+    color:#000 !important;
+    padding:0 !important;
+  }
+
+  .muted { color:#555 !important; }
+
+  /* Imprime seulement l'écran actuellement affiché */
+  section { display:none !important; }
+  section.active { display:block !important; }
+
+  /* Le récapitulatif est large : réduction supplémentaire */
+  #recap table { font-size:7.2pt !important; }
+  #recap th, #recap td { padding:2.5px 3px !important; }
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -284,7 +356,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.0 REPORT D'HEURES</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.1 IMPRESSION</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
