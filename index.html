@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.2 DATE GLOBALE LIBRE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.3 DATE GLOBALE APPLIQUÉE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -829,7 +829,14 @@ function renderReports(){
   </tr>`
  }).join('');
 
+ const globalVisibleDate=el('globalReportDate')?.value||'';
  refreshGlobalReportDate();
+ // Si l'utilisateur avait déjà choisi une date globale, on la conserve
+ // visuellement dans toutes les lignes, même si elle appartient à un autre mois.
+ if(globalVisibleDate){
+   if(el('globalReportDate'))el('globalReportDate').value=globalVisibleDate;
+   document.querySelectorAll('[data-report-cutoff]').forEach(inp=>inp.value=globalVisibleDate);
+ }
 
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
   inp.addEventListener('change',()=>{
@@ -876,8 +883,7 @@ async function applyGlobalReportDate(){
 
  const targetYm=date.slice(0,7);
 
- // La date choisie est totalement libre : elle peut appartenir à n'importe quel mois.
- // On l'enregistre dans le mois auquel elle appartient.
+ // La date est enregistrée dans le mois auquel elle appartient.
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
 
@@ -888,33 +894,34 @@ async function applyGlobalReportDate(){
    };
  });
 
- // Et, conformément à l'usage demandé, la date globale est recopiée
- // immédiatement dans TOUTES les dates individuelles actuellement affichées.
- document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-   inp.value=date;
- });
-
  persist();
 
- // Recalcule l'écran sans imposer que la date appartienne au mois affiché.
- // Les calculs internes continueront de rattacher la coupure au mois de la date.
- renderReports();
- renderMonth();
+ // D'abord on redessine les tableaux avec les données enregistrées.
  renderRecap();
+ renderMonth();
 
+ // IMPORTANT :
+ // renderRecap() recrée entièrement les champs de date.
+ // On applique donc la date globale APRES le rendu afin qu'elle reste
+ // réellement visible dans toutes les lignes individuelles.
+ document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+   inp.value=date;
+   inp.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+
+ // Le champ global conserve lui aussi la date choisie.
  if(el('globalReportDate'))el('globalReportDate').value=date;
 
  try{
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
-   alert('Date de report appliquée à tous et enregistrée.');
+   alert('Date de report appliquée à tous : '+new Date(date+'T12:00').toLocaleDateString('fr-FR'));
  }catch(err){
    console.error(err);
    setSyncStatus('Date enregistrée localement — synchro en attente',false);
-   alert('Date enregistrée localement. La synchronisation reprendra dès que possible.');
+   alert('Date appliquée sur cet appareil. La synchronisation reprendra dès que possible.');
  }
 }
-
 async function clearGlobalReportDate(){
  const displayedYm=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
