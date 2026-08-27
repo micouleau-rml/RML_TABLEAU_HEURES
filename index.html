@@ -382,7 +382,7 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">La date globale peut être choisie librement sur toute l’année. Elle est enregistrée dans le mois auquel elle appartient et recopiée immédiatement dans toutes les dates individuelles.</p>
+   <p class="report-help">La date globale peut être choisie librement sur toute l’année. Une date du mois précédent sert uniquement au report entrant payé ce mois-ci et annule toute ancienne coupure du mois affiché. Un report vers le mois suivant n’existe que si une date du mois affiché est choisie.</p>
    <div class="global-report-date no-print">
     <div class="field">
       <label>Date de report pour tout le monde</label>
@@ -448,7 +448,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.7 REPORT CORRIGÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.8 REPORT SANS REPORT FANTÔME</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -853,7 +853,7 @@ function renderReports(){
    const rec=reportRecord(ym,emp.name);
 
    let cutoff=rec?.cutoffDate||'';
-   if(cutoff&&!validCutoffForMonth(cutoff,ym))cutoff='';
+   if(!validCutoffForMonth(cutoff,ym))cutoff='';
 
    // Logique métier :
    // le report du mois précédent est payé sur le mois affiché.
@@ -887,7 +887,8 @@ function renderReports(){
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
    inp.addEventListener('change',()=>{
      const emp=inp.dataset.reportCutoff;
-     const cutoff=inp.value;
+     const chosen=inp.value;
+     const cutoff=validCutoffForMonth(chosen,ym)?chosen:'';
      const incoming=carryInto(emp,ym);
      const earned=acquiredMinutes(emp,ym);
      const outgoing=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
@@ -928,10 +929,10 @@ async function applyGlobalReportDate(){
 
  const targetYm=date.slice(0,7);
 
- // La date est enregistrée dans le mois auquel elle appartient.
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
 
+ // Enregistre la date dans le mois auquel elle appartient.
  state.employees.forEach(emp=>{
    state.settings.monthlyReports[targetYm][emp.name]={
      cutoffDate:date,
@@ -939,32 +940,47 @@ async function applyGlobalReportDate(){
    };
  });
 
+ // IMPORTANT :
+ // si la date choisie n'appartient PAS au mois affiché,
+ // on efface toute ancienne coupure du mois affiché.
+ // Exemple : affichage août + date 29/07 => aucun report août -> septembre.
+ if(targetYm!==displayedYm){
+   state.settings.monthlyReports[displayedYm]=state.settings.monthlyReports[displayedYm]||{};
+   state.employees.forEach(emp=>{
+     state.settings.monthlyReports[displayedYm][emp.name]={
+       ...(state.settings.monthlyReports[displayedYm][emp.name]||{}),
+       cutoffDate:'',
+       updatedAt:new Date().toISOString()
+     };
+   });
+ }
+
  persist();
 
- // D'abord on redessine les tableaux avec les données enregistrées.
+ // Recalcule d'abord les données.
  renderRecap();
  renderMonth();
 
- // IMPORTANT :
- // renderRecap() recrée entièrement les champs de date.
- // On applique donc la date globale APRES le rendu afin qu'elle reste
- // réellement visible dans toutes les lignes individuelles.
+ // Puis affiche la date globale choisie dans toutes les cases individuelles,
+ // uniquement comme repère visuel. Le calcul reste rattaché au mois réel de la date.
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
    inp.value=date;
-   inp.dispatchEvent(new Event('change',{bubbles:true}));
  });
 
- // Le champ global conserve lui aussi la date choisie.
  if(el('globalReportDate'))el('globalReportDate').value=date;
 
  try{
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
-   alert('Date de report appliquée à tous : '+new Date(date+'T12:00').toLocaleDateString('fr-FR'));
+   if(targetYm!==displayedYm){
+     alert('Date appliquée au report du mois précédent. Les heures du mois affiché restent payées ce mois-ci.');
+   }else{
+     alert('Date de report appliquée à tous pour le mois affiché.');
+   }
  }catch(err){
    console.error(err);
    setSyncStatus('Date enregistrée localement — synchro en attente',false);
-   alert('Date appliquée sur cet appareil. La synchronisation reprendra dès que possible.');
+   alert('Date appliquée localement. La synchronisation reprendra dès que possible.');
  }
 }
 async function clearGlobalReportDate(){
