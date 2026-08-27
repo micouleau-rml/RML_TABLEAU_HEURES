@@ -356,7 +356,7 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">La date est enregistrée dans le mois auquel elle appartient. Exemple : en affichant août, une date du 29/07 définit directement le report juillet → août, sans changer le mois sélectionné. Une date d’août définit le report août → septembre.</p>
+   <p class="report-help">La date globale peut être choisie librement sur toute l’année. Elle est enregistrée dans le mois auquel elle appartient et recopiée immédiatement dans toutes les dates individuelles.</p>
    <div class="global-report-date no-print">
     <div class="field">
       <label>Date de report pour tout le monde</label>
@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.1 DATE INDÉPENDANTE DU MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.2 DATE GLOBALE LIBRE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -874,14 +874,10 @@ async function applyGlobalReportDate(){
  if(!displayedYm)return alert('Choisis le mois.');
  if(!date)return alert('Choisis une date de report.');
 
- // La date décide elle-même du mois auquel appartient la coupure.
  const targetYm=date.slice(0,7);
- const prevYm=previousMonth(displayedYm);
 
- if(targetYm!==displayedYm && targetYm!==prevYm){
-   return alert('La date doit appartenir au mois affiché ou au mois précédent.');
- }
-
+ // La date choisie est totalement libre : elle peut appartenir à n'importe quel mois.
+ // On l'enregistre dans le mois auquel elle appartient.
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
 
@@ -892,36 +888,33 @@ async function applyGlobalReportDate(){
    };
  });
 
+ // Et, conformément à l'usage demandé, la date globale est recopiée
+ // immédiatement dans TOUTES les dates individuelles actuellement affichées.
+ document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+   inp.value=date;
+ });
+
  persist();
 
- // Si la date concerne le mois affiché, mettre aussi à jour immédiatement
- // toutes les dates individuelles visibles.
- if(targetYm===displayedYm){
-   document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-     inp.value=date;
-     inp.dispatchEvent(new Event('change',{bubbles:true}));
-   });
- }
-
- // Recalcul immédiat du récap affiché, du tableau Mois et du report.
- renderRecap();
+ // Recalcule l'écran sans imposer que la date appartienne au mois affiché.
+ // Les calculs internes continueront de rattacher la coupure au mois de la date.
+ renderReports();
  renderMonth();
- refreshGlobalReportDate();
+ renderRecap();
+
+ if(el('globalReportDate'))el('globalReportDate').value=date;
 
  try{
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
-   if(targetYm===prevYm){
-     alert('Date enregistrée sur '+monthLabelFr(targetYm)+'. Le report entrant de '+monthLabelFr(displayedYm)+' a été recalculé.');
-   }else{
-     alert('Date de report appliquée à tous pour '+monthLabelFr(targetYm)+'.');
-   }
+   alert('Date de report appliquée à tous et enregistrée.');
  }catch(err){
    console.error(err);
    setSyncStatus('Date enregistrée localement — synchro en attente',false);
    alert('Date enregistrée localement. La synchronisation reprendra dès que possible.');
  }
 }
+
 async function clearGlobalReportDate(){
  const displayedYm=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
