@@ -349,7 +349,7 @@ header .wrap{position:relative;z-index:1}
    <p class="report-help">Indique la date à partir de laquelle les heures supplémentaires doivent être reportées. Seules les heures sont reportées : les paniers restent intégralement comptabilisés et réglés sur leur mois de travail. Les heures transmises/payées restent modifiables manuellement.</p>
    <div class="global-report-date no-print">
     <div class="field">
-      <label>Date de début du report pour tout le monde</label>
+      <label>Date de début du report (mois courant ou précédent)</label>
       <input type="date" id="globalReportDate">
     </div>
     <button type="button" class="secondary" id="applyGlobalReportDate">Appliquer à tous</button>
@@ -399,7 +399,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.5 DATE DE REPORT GLOBALE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.5.6 REPORT MOIS PRÉCÉDENT</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -796,13 +796,15 @@ function renderReports(){
    const rec=reportRecord(ym,emp.name);
    let cutoff=rec?.cutoffDate||'';
    if(cutoff&&!validCutoffForMonth(cutoff,ym))cutoff='';
+   const prevRec=reportRecord(previousMonth(ym),emp.name);
+   const incomingCutoff=prevRec?.cutoffDate||'';
    const before=acquiredMinutesBefore(emp.name,ym,cutoff);
    const from=cutoff?acquiredMinutesFrom(emp.name,ym,cutoff):0;
    const paid=rec?Math.max(0,Math.min(available,Number(rec.paidMinutes)||0)):available;
    const carry=Math.max(0,available-paid);
    return `<tr>
     <td><b>${esc(emp.name)}</b></td>
-    <td>${time(opening)}</td>
+    <td>${time(opening)}${incomingCutoff?`<div class="muted" style="font-size:11px">depuis le ${new Date(incomingCutoff+'T12:00').toLocaleDateString('fr-FR')}</div>`:''}</td>
     <td>${time(earned)}</td>
     <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${cutoff}"></td>
     <td data-report-before="${esc(emp.name)}">${time(before)}</td>
@@ -850,9 +852,44 @@ function applyGlobalReportDate(){
  const ym=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
  if(!ym)return alert('Choisis le mois.');
- if(date&&!validCutoffForMonth(date,ym)){
-   return alert('La date de report doit être comprise dans le mois sélectionné.');
+ const prevYm=previousMonth(ym);
+ if(date&&!validCutoffForMonth(date,ym)&&!validCutoffForMonth(date,prevYm)){
+   return alert('La date de report doit être comprise dans le mois sélectionné ou dans le mois précédent.');
  }
+
+ // Si la date appartient au mois précédent, elle définit directement
+ // le report entrant du mois affiché.
+ if(date&&validCutoffForMonth(date,prevYm)){
+   state.settings.monthlyReports=state.settings.monthlyReports||{};
+   state.settings.monthlyReports[prevYm]=state.settings.monthlyReports[prevYm]||{};
+
+   state.employees.forEach(emp=>{
+     const earnedPrev=acquiredMinutes(emp.name,prevYm);
+     const openingPrev=carryInto(emp.name,prevYm);
+     const beforePrev=acquiredMinutesBefore(emp.name,prevYm,date);
+     const availablePrev=Math.max(0,openingPrev+earnedPrev);
+     const paidPrev=Math.max(0,Math.min(availablePrev,openingPrev+beforePrev));
+     state.settings.monthlyReports[prevYm][emp.name]={
+       paidMinutes:paidPrev,
+       cutoffDate:date,
+       updatedAt:new Date().toISOString()
+     };
+   });
+
+   persist();
+   renderRecap();
+   pushSettings().then(()=>{
+     setSyncStatus('Supabase synchronisé ✓');
+     alert('Date appliquée au mois précédent : le report entrant du mois affiché a été recalculé.');
+   }).catch(err=>{
+     console.error(err);
+     setSyncStatus('Date enregistrée localement — synchro en attente',false);
+     alert('Date appliquée localement. La synchronisation Supabase reprendra dès que possible.');
+   });
+   return;
+ }
+
+ // Sinon, comportement normal sur le mois actuellement affiché.
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
    inp.value=date;
    inp.dispatchEvent(new Event('change',{bubbles:true}));
