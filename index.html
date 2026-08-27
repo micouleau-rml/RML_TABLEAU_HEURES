@@ -356,10 +356,10 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">La date groupée peut appartenir au mois affiché ou au mois précédent. Une date du mois précédent définit le report entrant payé ce mois-ci ; une date du mois affiché définit les heures à reporter vers le mois suivant. Les paniers restent payés sur leur mois de travail.</p>
+   <p class="report-help">La date est enregistrée dans le mois auquel elle appartient. Exemple : en affichant août, une date du 29/07 définit directement le report juillet → août, sans changer le mois sélectionné. Une date d’août définit le report août → septembre.</p>
    <div class="global-report-date no-print">
     <div class="field">
-      <label>Date de report pour tout le monde (mois courant ou précédent)</label>
+      <label>Date de report pour tout le monde</label>
       <input type="date" id="globalReportDate">
     </div>
     <button type="button" class="secondary" id="applyGlobalReportDate">Appliquer à tous</button>
@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.0 DATE GLOBALE MOIS PRÉCÉDENT</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.1 DATE INDÉPENDANTE DU MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -855,74 +855,104 @@ function refreshGlobalReportDate(){
  const ym=el('recapMonth')?.value;
  const input=el('globalReportDate');
  if(!input||!ym)return;
- const dates=state.employees.map(emp=>{
-  const d=reportRecord(ym,emp.name)?.cutoffDate||'';
-  return validCutoffForMonth(d,ym)?d:'';
- }).filter(Boolean);
- input.value=(dates.length===state.employees.length&&new Set(dates).size===1)?dates[0]:'';
+
+ const commonForMonth=(targetYm)=>{
+   const vals=state.employees.map(emp=>{
+     const d=reportRecord(targetYm,emp.name)?.cutoffDate||'';
+     return validCutoffForMonth(d,targetYm)?d:'';
+   });
+   return vals.length===state.employees.length && vals.every(Boolean) && new Set(vals).size===1 ? vals[0] : '';
+ };
+
+ // Priorité à la coupure du mois affiché. À défaut, on montre la coupure
+ // du mois précédent afin de visualiser clairement le report entrant.
+ input.value=commonForMonth(ym)||commonForMonth(previousMonth(ym))||'';
 }
-function applyGlobalReportDate(){
- const ym=el('recapMonth')?.value;
+async function applyGlobalReportDate(){
+ const displayedYm=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
- if(!ym)return alert('Choisis le mois.');
+ if(!displayedYm)return alert('Choisis le mois.');
  if(!date)return alert('Choisis une date de report.');
 
- const prevYm=previousMonth(ym);
+ // La date décide elle-même du mois auquel appartient la coupure.
+ const targetYm=date.slice(0,7);
+ const prevYm=previousMonth(displayedYm);
 
- // Cas 1 : la date appartient au mois affiché.
- // Elle sert à reporter les heures de ce mois vers le mois suivant
- // et met à jour immédiatement toutes les dates individuelles visibles.
- if(validCutoffForMonth(date,ym)){
+ if(targetYm!==displayedYm && targetYm!==prevYm){
+   return alert('La date doit appartenir au mois affiché ou au mois précédent.');
+ }
+
+ state.settings.monthlyReports=state.settings.monthlyReports||{};
+ state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
+
+ state.employees.forEach(emp=>{
+   state.settings.monthlyReports[targetYm][emp.name]={
+     cutoffDate:date,
+     updatedAt:new Date().toISOString()
+   };
+ });
+
+ persist();
+
+ // Si la date concerne le mois affiché, mettre aussi à jour immédiatement
+ // toutes les dates individuelles visibles.
+ if(targetYm===displayedYm){
    document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
      inp.value=date;
      inp.dispatchEvent(new Event('change',{bubbles:true}));
    });
-   return;
  }
 
- // Cas 2 : la date appartient au mois précédent.
- // Elle sert à définir le report entrant du mois affiché.
- if(validCutoffForMonth(date,prevYm)){
-   state.settings.monthlyReports=state.settings.monthlyReports||{};
-   state.settings.monthlyReports[prevYm]=state.settings.monthlyReports[prevYm]||{};
+ // Recalcul immédiat du récap affiché, du tableau Mois et du report.
+ renderRecap();
+ renderMonth();
+ refreshGlobalReportDate();
 
+ try{
+   await pushSettings();
+   setSyncStatus('Supabase synchronisé ✓');
+   if(targetYm===prevYm){
+     alert('Date enregistrée sur '+monthLabelFr(targetYm)+'. Le report entrant de '+monthLabelFr(displayedYm)+' a été recalculé.');
+   }else{
+     alert('Date de report appliquée à tous pour '+monthLabelFr(targetYm)+'.');
+   }
+ }catch(err){
+   console.error(err);
+   setSyncStatus('Date enregistrée localement — synchro en attente',false);
+   alert('Date enregistrée localement. La synchronisation reprendra dès que possible.');
+ }
+}
+async function clearGlobalReportDate(){
+ const displayedYm=el('recapMonth')?.value;
+ const date=el('globalReportDate')?.value||'';
+ const targetYm=date?date.slice(0,7):displayedYm;
+ if(!targetYm)return;
+
+ if(state.settings.monthlyReports?.[targetYm]){
    state.employees.forEach(emp=>{
-     state.settings.monthlyReports[prevYm][emp.name]={
-       cutoffDate:date,
-       updatedAt:new Date().toISOString()
-     };
+     if(state.settings.monthlyReports[targetYm][emp.name]){
+       state.settings.monthlyReports[targetYm][emp.name].cutoffDate='';
+       state.settings.monthlyReports[targetYm][emp.name].updatedAt=new Date().toISOString();
+     }
    });
-
-   persist();
-
-   // Important : on ne touche pas aux dates individuelles du mois affiché.
-   // On recalcule seulement le report entrant et les montants du mois.
-   renderReports();
-   renderMonth();
-   renderRecap();
-
-   pushSettings().then(()=>{
-     setSyncStatus('Supabase synchronisé ✓');
-     alert('Date appliquée au mois précédent. Le report entrant du mois affiché a été recalculé.');
-   }).catch(err=>{
-     console.error(err);
-     setSyncStatus('Date enregistrée localement — synchro en attente',false);
-     alert('Date appliquée localement. La synchronisation Supabase reprendra dès que possible.');
-   });
-   return;
  }
 
- alert('La date doit être comprise dans le mois sélectionné ou dans le mois précédent.');
-}
-
-function clearGlobalReportDate(){
  if(el('globalReportDate'))el('globalReportDate').value='';
- document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-   inp.value='';
-   inp.dispatchEvent(new Event('change',{bubbles:true}));
- });
-}
 
+ if(targetYm===displayedYm){
+   document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+     inp.value='';
+     inp.dispatchEvent(new Event('change',{bubbles:true}));
+   });
+ }
+
+ persist();
+ renderRecap();
+ renderMonth();
+
+ try{await pushSettings();setSyncStatus('Supabase synchronisé ✓')}
+ catch(err){console.error(err);setSyncStatus('Modification locale — synchro en attente',false)}
+}
 async function saveReports(){
  const ym=el('recapMonth')?.value;
  if(!ym)return alert('Choisis le mois.');
