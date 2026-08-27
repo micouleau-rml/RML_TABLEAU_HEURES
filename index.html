@@ -356,10 +356,10 @@ header .wrap{position:relative;z-index:1}
 
   <div class="report-card">
    <h2 style="margin-bottom:5px">Report d'heures au mois suivant</h2>
-   <p class="report-help">Les heures reportées du mois précédent sont obligatoirement payées ce mois-ci et ne peuvent jamais être reportées une seconde fois. La date de report affichée correspond uniquement au mois sélectionné. Les paniers restent payés sur leur mois de travail.</p>
+   <p class="report-help">La date groupée peut appartenir au mois affiché ou au mois précédent. Une date du mois précédent définit le report entrant payé ce mois-ci ; une date du mois affiché définit les heures à reporter vers le mois suivant. Les paniers restent payés sur leur mois de travail.</p>
    <div class="global-report-date no-print">
     <div class="field">
-      <label>Date de début du report pour tout le monde</label>
+      <label>Date de report pour tout le monde (mois courant ou précédent)</label>
       <input type="date" id="globalReportDate">
     </div>
     <button type="button" class="secondary" id="applyGlobalReportDate">Appliquer à tous</button>
@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.5.9 DATE DE REPORT PAR MOIS</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.0 DATE GLOBALE MOIS PRÉCÉDENT</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -865,14 +865,56 @@ function applyGlobalReportDate(){
  const ym=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
  if(!ym)return alert('Choisis le mois.');
- if(date&&!validCutoffForMonth(date,ym)){
-  return alert('La date de report doit être comprise dans le mois sélectionné.');
+ if(!date)return alert('Choisis une date de report.');
+
+ const prevYm=previousMonth(ym);
+
+ // Cas 1 : la date appartient au mois affiché.
+ // Elle sert à reporter les heures de ce mois vers le mois suivant
+ // et met à jour immédiatement toutes les dates individuelles visibles.
+ if(validCutoffForMonth(date,ym)){
+   document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
+     inp.value=date;
+     inp.dispatchEvent(new Event('change',{bubbles:true}));
+   });
+   return;
  }
- document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-  inp.value=date;
-  inp.dispatchEvent(new Event('change',{bubbles:true}));
- });
+
+ // Cas 2 : la date appartient au mois précédent.
+ // Elle sert à définir le report entrant du mois affiché.
+ if(validCutoffForMonth(date,prevYm)){
+   state.settings.monthlyReports=state.settings.monthlyReports||{};
+   state.settings.monthlyReports[prevYm]=state.settings.monthlyReports[prevYm]||{};
+
+   state.employees.forEach(emp=>{
+     state.settings.monthlyReports[prevYm][emp.name]={
+       cutoffDate:date,
+       updatedAt:new Date().toISOString()
+     };
+   });
+
+   persist();
+
+   // Important : on ne touche pas aux dates individuelles du mois affiché.
+   // On recalcule seulement le report entrant et les montants du mois.
+   renderReports();
+   renderMonth();
+   renderRecap();
+
+   pushSettings().then(()=>{
+     setSyncStatus('Supabase synchronisé ✓');
+     alert('Date appliquée au mois précédent. Le report entrant du mois affiché a été recalculé.');
+   }).catch(err=>{
+     console.error(err);
+     setSyncStatus('Date enregistrée localement — synchro en attente',false);
+     alert('Date appliquée localement. La synchronisation Supabase reprendra dès que possible.');
+   });
+   return;
+ }
+
+ alert('La date doit être comprise dans le mois sélectionné ou dans le mois précédent.');
 }
+
 function clearGlobalReportDate(){
  if(el('globalReportDate'))el('globalReportDate').value='';
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
