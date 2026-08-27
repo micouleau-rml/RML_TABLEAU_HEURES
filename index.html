@@ -409,7 +409,7 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.3 DATE GLOBALE APPLIQUÉE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.4 RÉCAP ALLÉGÉ</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -977,6 +977,56 @@ async function saveReports(){
   alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
  }
 }
+
+function optimizeRecapColumns(){
+ const table=el('recapBody')?.closest('table');
+ if(!table)return;
+
+ const rows=Array.from(table.querySelectorAll('tbody tr'));
+ const headers=Array.from(table.querySelectorAll('thead th'));
+ if(!rows.length||!headers.length)return;
+
+ // Colonnes toujours visibles : salarié, taux horaire, jours saisis, paniers.
+ const alwaysVisible=new Set([0,1,2,3]);
+
+ // Colonnes numériques / compteurs qui peuvent être masquées si tout le mois est à zéro.
+ for(let col=0;col<headers.length;col++){
+   if(alwaysVisible.has(col)){
+     headers[col].style.display='';
+     rows.forEach(r=>{ if(r.children[col]) r.children[col].style.display=''; });
+     continue;
+   }
+
+   const hasUsefulValue=rows.some(r=>{
+     const cell=r.children[col];
+     if(!cell)return false;
+     const txt=(cell.textContent||'').trim().toLowerCase();
+
+     // Considère comme vide les variantes courantes de zéro.
+     const zeroLike=[
+       '', '0', '0,00 €', '0.00 €', '0h00', '0:00',
+       '0h00 0,00 €', '0h00 0.00 €'
+     ];
+     if(zeroLike.includes(txt))return false;
+
+     // Ignore aussi les textes constitués uniquement de zéros / séparateurs / symboles.
+     const simplified=txt
+       .replace(/€/g,'')
+       .replace(/h/g,'')
+       .replace(/[:.,\s]/g,'')
+       .replace(/[()]/g,'')
+       .replace(/\+/g,'');
+     if(simplified && /^0+$/.test(simplified))return false;
+
+     return true;
+   });
+
+   const display=hasUsefulValue?'':'none';
+   headers[col].style.display=display;
+   rows.forEach(r=>{ if(r.children[col]) r.children[col].style.display=display; });
+ }
+}
+
 function renderRecap(){
  const ym=el('recapMonth').value,cfg=state.settings.overtime||{rate1:10,rate2:25,thresholdHours:4};
  el('recapBody').innerHTML=state.employees.map(emp=>{
@@ -998,13 +1048,13 @@ function renderRecap(){
    <td>${money(rate).replace(' €',' €/h')}</td><td>${r.length}</td><td><b>${paniers}</b></td>
    <td>${time(sum('sup'))}</td><td>${time(sum('route'))}</td><td>${time(ded)}</td>
    <td><b>${time(opening+paidCurrent)}</b>${reportNext>0?`<div class="muted" style="font-size:11px">${time(reportNext)} reporté</div>`:''}</td>
-   <td>${time(sp.m1)} <span class="muted">(+${cfg.rate1}%)</span></td><td><b>${money(amounts.amount10)}</b></td>
-   <td>${time(sp.m2)} <span class="muted">(+${cfg.rate2}%)</span></td><td><b>${money(amounts.amount25)}</b></td>
+   <td>${time(sp.m1)}</td><td><b>${money(amounts.amount10)}</b></td>
+   <td>${time(sp.m2)}</td><td><b>${money(amounts.amount25)}</b></td>
    <td><b>${money(amounts.total)}</b></td>
    <td>${count('ABS')}</td><td>${count('MAL')}</td><td>${count('AT')}</td><td>${count('CGE')}</td><td>${count('FORM')}</td>
   </tr>`
  }).join('');
- renderReports()
+ renderReports();optimizeRecapColumns()
 }
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;renderEmployeeSettings();renderTeamSettings()}
 function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
