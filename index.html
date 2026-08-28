@@ -280,6 +280,13 @@ header .wrap{position:relative;z-index:1}
 }
 </style>
 
+
+<style id="v170-new-entry">
+#employee:invalid{color:#98a2b3}
+#employee option{color:#172033}
+#employee option[value=""]{color:#98a2b3}
+</style>
+
 </head>
 <body>
 <header>
@@ -320,7 +327,7 @@ header .wrap{position:relative;z-index:1}
     <div class="team-summary" id="teamSummary">0 salarié sélectionné</div>
    </div>
    <div class="grid grid2">
-    <div class="field"><label>Salarié</label><select id="employee"></select></div>
+    <div class="field"><label>Salarié</label><select id="employee" required></select></div>
     <div class="field"><label>Date</label><input id="date" type="date"></div>
    <div id="absenceRange">
     <div class="field" style="margin:0"><label>Date de fin</label><input id="absenceEnd" type="date"></div>
@@ -448,7 +455,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.9 DÉPART CHANTIER OU ATELIER</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.7.0 NOUVELLE SAISIE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -518,7 +525,7 @@ async function syncFromCloud(){if(!navigator.onLine){setSyncStatus('Hors ligne �
 }else{
   state.settings=normalizeSettings(state.settings);
   await pushSettings();
-}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();renderSettings();updateCalc();renderMonth();renderRecap();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){
+}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();ensureEmployeePlaceholder();renderSettings();updateCalc();renderMonth();renderRecap();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){
  console.error('Erreur synchronisation Supabase :',err);
  setSyncStatus('Erreur synchro — données locales conservées',false,err?.message||String(err));
  return false
@@ -677,7 +684,32 @@ async function saveEntry(){
    alert('Journée enregistrée sur cet appareil. La synchronisation Supabase reprendra dès que possible.');
  }
 }
-function clearForm(){editId=null;if(el('absenceEnd'))el('absenceEnd').value='';el('startOverride').value='';el('depart').value='';el('arrivee').value='';el('deduction').value='00:00';el('comment').value='';updateCalc();el('saveBtn').textContent='Enregistrer la journée'}
+function clearForm(){
+ const keepDate=el('date')?.value||'';
+
+ editId=null;
+
+ if(el('employee'))el('employee').value='';
+ if(el('type'))el('type').value='CONT';
+ if(el('startOverride'))el('startOverride').value='';
+ if(el('depart'))el('depart').value='';
+ if(el('arrivee'))el('arrivee').value='';
+ if(el('deduction'))el('deduction').value='00:00';
+ if(el('comment'))el('comment').value='';
+ if(el('absenceEnd'))el('absenceEnd').value='';
+ if(el('leaveEnd'))el('leaveEnd').value='';
+
+ // Désélection des équipes / retour au mode salarié seul
+ document.querySelectorAll('.teamMemberCheck').forEach(cb=>cb.checked=false);
+ if(el('teamPreset'))el('teamPreset').value='';
+ if(typeof teamMode==='function')teamMode(false);
+
+ // Conserver uniquement la date
+ if(el('date'))el('date').value=keepDate;
+
+ updateCalc();
+ if(typeof updateTeamSummary==='function')updateTeamSummary();
+}
 function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
 async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
 function panierForEntry(e){return ['CONT','CLA','SAM','FORM'].includes(e?.type)?1:0}
@@ -1275,6 +1307,20 @@ async function restoreFullBackup(file){
  }
 }
 
+
+function ensureEmployeePlaceholder(){
+ const sel=el('employee');
+ if(!sel)return;
+ if(!sel.querySelector('option[value=""]')){
+   const opt=document.createElement('option');
+   opt.value='';
+   opt.textContent='Saisir un salarié dans la liste';
+   opt.disabled=true;
+   sel.insertBefore(opt,sel.firstChild);
+ }
+ if(!sel.value)sel.value='';
+}
+
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier ou atelier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
@@ -1300,7 +1346,13 @@ if(el('toggleTeamSettings')){
  const collapsed=localStorage.getItem('rml_team_settings_collapsed')==='1';
  if(collapsed){el('teamSettingsPanel').classList.add('collapsed');el('toggleTeamSettings').textContent='Ouvrir'}
 }el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
-options();setToday();renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();syncFromCloud();
+options();ensureEmployeePlaceholder();setToday();if(el('employee'))el('employee').value='';renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();syncFromCloud();
 </script>
+
+document.addEventListener('DOMContentLoaded',()=>{
+ const newBtn=Array.from(document.querySelectorAll('button')).find(b=>b.textContent.trim()==='Nouvelle saisie');
+ if(newBtn)newBtn.onclick=clearForm;
+});
+
 </body>
 </html>
