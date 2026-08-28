@@ -455,7 +455,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.7.1 CORRECTION SCRIPT</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.7.2 DATE DE REPORT PERSISTANTE</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -886,6 +886,7 @@ function renderReports(){
 
    let cutoff=rec?.cutoffDate||'';
    if(!validCutoffForMonth(cutoff,ym))cutoff='';
+   const displayDate=rec?.displayDate||cutoff||'';
 
    // Logique métier :
    // le report du mois précédent est payé sur le mois affiché.
@@ -903,7 +904,7 @@ function renderReports(){
     <td><b>${esc(emp.name)}</b></td>
     <td>${time(incoming)}${incoming>0?`<div class="muted" style="font-size:11px">payé en ${monthLabelFr(ym)}</div>`:''}</td>
     <td>${time(earned)}</td>
-    <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${cutoff}"></td>
+    <td><input type="date" class="report-date-input" data-report-cutoff="${esc(emp.name)}" value="${displayDate}"></td>
     <td>${time(hoursBefore)}</td>
     <td><b>${time(hoursFromDate)}</b></td>
     <td><b>${time(payable)}</b></td>
@@ -921,6 +922,17 @@ function renderReports(){
      const emp=inp.dataset.reportCutoff;
      const chosen=inp.value;
      const cutoff=validCutoffForMonth(chosen,ym)?chosen:'';
+
+     state.settings.monthlyReports=state.settings.monthlyReports||{};
+     state.settings.monthlyReports[ym]=state.settings.monthlyReports[ym]||{};
+     state.settings.monthlyReports[ym][emp]={
+       ...(state.settings.monthlyReports[ym][emp]||{}),
+       displayDate:chosen,
+       cutoffDate:cutoff,
+       updatedAt:new Date().toISOString()
+     };
+     persist();
+
      const incoming=carryInto(emp,ym);
      const earned=acquiredMinutes(emp,ym);
      const outgoing=cutoff?acquiredMinutesFrom(emp,ym,cutoff):0;
@@ -941,7 +953,12 @@ function refreshGlobalReportDate(){
  const input=el('globalReportDate');
  if(!input||!ym)return;
 
- const commonForMonth=(targetYm)=>{
+ const commonDisplay=()=>{
+   const vals=state.employees.map(emp=>reportRecord(ym,emp.name)?.displayDate||'');
+   return vals.length===state.employees.length && vals.every(Boolean) && new Set(vals).size===1 ? vals[0] : '';
+ };
+
+ const commonCutoff=(targetYm)=>{
    const vals=state.employees.map(emp=>{
      const d=reportRecord(targetYm,emp.name)?.cutoffDate||'';
      return validCutoffForMonth(d,targetYm)?d:'';
@@ -949,10 +966,9 @@ function refreshGlobalReportDate(){
    return vals.length===state.employees.length && vals.every(Boolean) && new Set(vals).size===1 ? vals[0] : '';
  };
 
- // Priorité à la coupure du mois affiché. À défaut, on montre la coupure
- // du mois précédent afin de visualiser clairement le report entrant.
- input.value=commonForMonth(ym)||commonForMonth(previousMonth(ym))||'';
+ input.value=commonDisplay()||commonCutoff(ym)||commonCutoff(previousMonth(ym))||'';
 }
+
 async function applyGlobalReportDate(){
  const displayedYm=el('recapMonth')?.value;
  const date=el('globalReportDate')?.value||'';
@@ -963,38 +979,31 @@ async function applyGlobalReportDate(){
 
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
+ state.settings.monthlyReports[displayedYm]=state.settings.monthlyReports[displayedYm]||{};
 
- // Enregistre la date dans le mois auquel elle appartient.
  state.employees.forEach(emp=>{
+   // Coupure réelle rattachée au mois de la date.
    state.settings.monthlyReports[targetYm][emp.name]={
+     ...(state.settings.monthlyReports[targetYm][emp.name]||{}),
      cutoffDate:date,
+     updatedAt:new Date().toISOString()
+   };
+
+   // Date affichée mémorisée dans le mois actuellement consulté.
+   state.settings.monthlyReports[displayedYm][emp.name]={
+     ...(state.settings.monthlyReports[displayedYm][emp.name]||{}),
+     displayDate:date,
+     cutoffDate:targetYm===displayedYm ? date : '',
      updatedAt:new Date().toISOString()
    };
  });
 
- // IMPORTANT :
- // si la date choisie n'appartient PAS au mois affiché,
- // on efface toute ancienne coupure du mois affiché.
- // Exemple : affichage août + date 29/07 => aucun report août -> septembre.
- if(targetYm!==displayedYm){
-   state.settings.monthlyReports[displayedYm]=state.settings.monthlyReports[displayedYm]||{};
-   state.employees.forEach(emp=>{
-     state.settings.monthlyReports[displayedYm][emp.name]={
-       ...(state.settings.monthlyReports[displayedYm][emp.name]||{}),
-       cutoffDate:'',
-       updatedAt:new Date().toISOString()
-     };
-   });
- }
-
  persist();
 
- // Recalcule d'abord les données.
  renderRecap();
  renderMonth();
 
- // Puis affiche la date globale choisie dans toutes les cases individuelles,
- // uniquement comme repère visuel. Le calcul reste rattaché au mois réel de la date.
+ // Après le rendu, les champs restent sur la date choisie.
  document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
    inp.value=date;
  });
@@ -1004,40 +1013,31 @@ async function applyGlobalReportDate(){
  try{
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
-   if(targetYm!==displayedYm){
-     alert('Date appliquée au report du mois précédent. Les heures du mois affiché restent payées ce mois-ci.');
-   }else{
-     alert('Date de report appliquée à tous pour le mois affiché.');
-   }
+   alert('Date de report appliquée à tous et mémorisée.');
  }catch(err){
    console.error(err);
    setSyncStatus('Date enregistrée localement — synchro en attente',false);
    alert('Date appliquée localement. La synchronisation reprendra dès que possible.');
  }
 }
+
 async function clearGlobalReportDate(){
  const displayedYm=el('recapMonth')?.value;
- const date=el('globalReportDate')?.value||'';
- const targetYm=date?date.slice(0,7):displayedYm;
- if(!targetYm)return;
+ if(!displayedYm)return;
 
- if(state.settings.monthlyReports?.[targetYm]){
-   state.employees.forEach(emp=>{
-     if(state.settings.monthlyReports[targetYm][emp.name]){
-       state.settings.monthlyReports[targetYm][emp.name].cutoffDate='';
-       state.settings.monthlyReports[targetYm][emp.name].updatedAt=new Date().toISOString();
-     }
-   });
- }
+ state.settings.monthlyReports=state.settings.monthlyReports||{};
+ state.settings.monthlyReports[displayedYm]=state.settings.monthlyReports[displayedYm]||{};
+
+ state.employees.forEach(emp=>{
+   state.settings.monthlyReports[displayedYm][emp.name]={
+     ...(state.settings.monthlyReports[displayedYm][emp.name]||{}),
+     displayDate:'',
+     cutoffDate:'',
+     updatedAt:new Date().toISOString()
+   };
+ });
 
  if(el('globalReportDate'))el('globalReportDate').value='';
-
- if(targetYm===displayedYm){
-   document.querySelectorAll('[data-report-cutoff]').forEach(inp=>{
-     inp.value='';
-     inp.dispatchEvent(new Event('change',{bubbles:true}));
-   });
- }
 
  persist();
  renderRecap();
@@ -1046,28 +1046,48 @@ async function clearGlobalReportDate(){
  try{await pushSettings();setSyncStatus('Supabase synchronisé ✓')}
  catch(err){console.error(err);setSyncStatus('Modification locale — synchro en attente',false)}
 }
+
 async function saveReports(){
  const ym=el('recapMonth')?.value;
  if(!ym)return alert('Choisis le mois.');
+
  state.settings.monthlyReports=state.settings.monthlyReports||{};
  state.settings.monthlyReports[ym]=state.settings.monthlyReports[ym]||{};
+
  for(const emp of state.employees){
-  const cutoffInput=document.querySelector(`[data-report-cutoff="${CSS.escape(emp.name)}"]`);
-  const cutoffDate=cutoffInput?.value||'';
-  if(cutoffDate&&!validCutoffForMonth(cutoffDate,ym)){
-   alert(`La date de début du report de ${emp.name} doit être dans le mois sélectionné.`);
-   return;
-  }
-  state.settings.monthlyReports[ym][emp.name]={cutoffDate,updatedAt:new Date().toISOString()};
+   const input=document.querySelector(`[data-report-cutoff="${CSS.escape(emp.name)}"]`);
+   const chosen=input?.value||'';
+   const targetYm=chosen?chosen.slice(0,7):ym;
+
+   state.settings.monthlyReports[ym][emp.name]={
+     ...(state.settings.monthlyReports[ym][emp.name]||{}),
+     displayDate:chosen,
+     cutoffDate:targetYm===ym ? chosen : '',
+     updatedAt:new Date().toISOString()
+   };
+
+   if(chosen){
+     state.settings.monthlyReports[targetYm]=state.settings.monthlyReports[targetYm]||{};
+     state.settings.monthlyReports[targetYm][emp.name]={
+       ...(state.settings.monthlyReports[targetYm][emp.name]||{}),
+       cutoffDate:chosen,
+       updatedAt:new Date().toISOString()
+     };
+   }
  }
- persist();renderReports();renderMonth();
+
+ persist();
+ renderReports();
+ renderMonth();
+
  try{
-  await pushSettings();
-  setSyncStatus('Supabase synchronisé ✓');
-  alert('Dates de report enregistrées et synchronisées.');
+   await pushSettings();
+   setSyncStatus('Supabase synchronisé ✓');
+   alert('Dates de report enregistrées et synchronisées.');
  }catch(err){
-  console.error(err);setSyncStatus('Reports sauvegardés localement',false);
-  alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
+   console.error(err);
+   setSyncStatus('Reports sauvegardés localement',false);
+   alert('Reports enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
  }
 }
 
