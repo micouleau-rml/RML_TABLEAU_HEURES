@@ -331,7 +331,7 @@ header .wrap{position:relative;z-index:1}
    <div id="timeFields">
     <div class="grid grid2">
      <div class="field"><label>Heure d'embauche décalée <span class="muted">(facultatif)</span></label><input id="startOverride" type="time"><div class="muted" style="margin-top:5px">La débauche normale est recalculée automatiquement à partir de cette heure.</div></div>
-     <div class="field"><label>Départ chantier</label><input id="depart" type="time"></div>
+     <div class="field"><label>Départ chantier ou atelier</label><input id="depart" type="time"></div>
     </div>
     <div class="grid grid2">
      <div class="field"><label>Arrivée dépôt</label><input id="arrivee" type="time"></div>
@@ -448,7 +448,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V1.6.8 REPORT SANS REPORT FANTÔME</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V1.6.9 DÉPART CHANTIER OU ATELIER</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1276,7 +1276,7 @@ async function restoreFullBackup(file){
 }
 
 function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
-function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
+function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier ou atelier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
 el('type')?.addEventListener('input',updateCalc);
 el('type')?.addEventListener('change',updateCalc);el('saveBtn').onclick=saveEntry;
