@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V29</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V30</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -460,7 +460,7 @@ header .wrap{position:relative;z-index:1}
    <div class="field">
     <label>Période de suivi</label>
     <select id="leavePeriod"></select>
-    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Pour les congés payés, les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus.</div>
+    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus. Le fractionnement est calculé automatiquement selon les règles CIBTP.</div>
    </div>
    <div class="field">
     <label>Salarié affiché dans le résumé</label>
@@ -485,13 +485,15 @@ header .wrap{position:relative;z-index:1}
    <div class="kpi"><span>Solde après planifiés</span><b id="leaveTotalBalance">0 j</b></div>
   </div>
 
+  <div class="note" style="margin:12px 0 14px"><b>Fractionnement CIBTP automatique :</b> 0, 1 ou 2 jours selon les congés réellement pris. Conditions cumulatives : au moins 15 jours acquis, une fraction de 12 jours ouvrables continus avant le 1er novembre, puis 3 à 5 jours du congé principal pris après le 31 octobre = 1 jour supplémentaire ; 6 jours ou plus = 2 jours. La 5e semaine n’ouvre pas de droit au fractionnement.</div>
+
   <div class="table-wrap">
    <table>
     <thead>
      <tr>
       <th>Salarié</th>
       <th>Droits acquis</th>
-      <th>Jours de fractionnement</th>
+      <th>Fractionnement automatique</th>
       <th>Congés pris</th>
       <th>Congés planifiés</th>
       <th>Solde disponible</th>
@@ -566,7 +568,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V29</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V30</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1436,8 +1438,82 @@ function initLeavePeriods(){
 function leaveRights(period,employee){
  return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
 }
+function fractionLeaveRows(period,employee){
+ // La période CIBTP de prise liée à l'année N va du 1er mai N au 30 avril N+1.
+ // Le tableau principal est découpé 01/04 -> 31/03 : on assemble donc N et avril N+1.
+ const y=Number(period);
+ const rows=[
+   ...leaveEntriesForPeriod(String(y),employee),
+   ...leaveEntriesForPeriod(String(y+1),employee)
+ ].filter(e=>e.date>=`${y}-05-01` && e.date<=`${y+1}-04-30`);
+ const seen=new Set();
+ return rows
+   .filter(e=>{
+     const k=`${e.employee}|${e.date}`;
+     if(seen.has(k))return false;
+     seen.add(k);
+     return true;
+   })
+   .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function hasTwelveContinuousBeforeNovember(period,employee,rows){
+ const y=Number(period);
+ const maxDate=`${y}-10-31`;
+ const eligible=rows.filter(e=>e.date<=maxDate);
+ if(eligible.length<12)return false;
+
+ // Reconstitue les fractions de congé : un intervalle de 1 à 3 jours entre
+ // deux jours décomptés peut correspondre à dimanche / jour(s) férié(s).
+ let count=1;
+ for(let i=1;i<eligible.length;i++){
+   const a=new Date(eligible[i-1].date+'T12:00:00');
+   const b=new Date(eligible[i].date+'T12:00:00');
+   const gap=Math.round((b-a)/86400000);
+
+   // Une journée de travail réellement enregistrée entre les deux coupe la fraction.
+   let workedBetween=false;
+   for(let d=new Date(a);d<b;d.setDate(d.getDate()+1)){
+     const iso=isoLocalDate(d);
+     if(iso===eligible[i-1].date)continue;
+     if(state.entries.some(x=>x.employee===employee && x.date===iso &&
+       ['CONT','CLA','SAM','FORM'].includes(x.type))){
+       workedBetween=true; break;
+     }
+   }
+
+   if(!workedBetween && gap<=3) count++;
+   else count=1;
+
+   if(count>=12)return true;
+ }
+ return count>=12;
+}
+
+function leaveFractionInfo(period,employee){
+ const rights=leaveRights(period,employee);
+ if(rights<15)return {days:0,reason:'Moins de 15 jours de congé légal acquis.'};
+
+ const today=todayIso();
+ const rows=fractionLeaveRows(period,employee).filter(e=>e.date<=today);
+ const y=Number(period);
+
+ if(!hasTwelveContinuousBeforeNovember(period,employee,rows)){
+   return {days:0,reason:'Il faut avoir pris 12 jours ouvrables continus avant le 1er novembre.'};
+ }
+
+ // Seuls les 24 premiers jours de congé légal (congé principal) ouvrent droit.
+ // Le classement chronologique permet d'exclure automatiquement la 5e semaine.
+ const principal=rows.slice(0,Math.min(24,Math.floor(rights)));
+ const afterOct=principal.filter(e=>e.date>=`${y}-11-01` && e.date<=`${y+1}-04-30`).length;
+
+ if(afterOct>=6)return {days:2,reason:`${afterOct} jours du congé principal pris après le 31 octobre.`};
+ if(afterOct>=3)return {days:1,reason:`${afterOct} jours du congé principal pris après le 31 octobre.`};
+ return {days:0,reason:`${afterOct} jour${afterOct>1?'s':''} du congé principal pris après le 31 octobre (minimum 3).`};
+}
+
 function leaveFraction(period,employee){
- return Number(state.settings.paidLeaveFractionnement?.[period]?.[employee])||0
+ return leaveFractionInfo(period,employee).days;
 }
 function leaveEntriesForPeriod(period,employee=''){
  const {start,end}=leavePeriodBounds(period);
@@ -1607,7 +1683,7 @@ function renderPaidLeave(){
    return `<tr data-leave-row="${esc(emp.name)}">
     <td><b>${esc(emp.name)}</b></td>
     <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-right="${esc(emp.name)}" value="${rights}"> j</td>
-    <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-fraction="${esc(emp.name)}" value="${fraction}"> j</td>
+    <td><b data-leave-fraction-auto="${esc(emp.name)}">${fraction} j</b><div class="muted" style="font-size:11px;margin-top:3px">${esc(leaveFractionInfo(period,emp.name).reason)}</div></td>
     <td><b data-leave-taken>${taken} j</b></td>
     <td data-leave-planned>${planned} j</td>
     <td data-leave-available><b>${available} j</b></td>
@@ -1615,7 +1691,7 @@ function renderPaidLeave(){
    </tr>`
  }).join('');
 
- document.querySelectorAll('[data-leave-right],[data-leave-fraction]').forEach(inp=>{
+ document.querySelectorAll('[data-leave-right]').forEach(inp=>{
    inp.addEventListener('input',recalcPaidLeaveFromInputs);
    inp.addEventListener('change',recalcPaidLeaveFromInputs);
  });
@@ -1635,9 +1711,23 @@ function renderPaidLeave(){
 function recalcPaidLeaveFromInputs(){
  document.querySelectorAll('#leaveBody tr[data-leave-row]').forEach(row=>{
    const rightsInput=row.querySelector('[data-leave-right]');
-   const fractionInput=row.querySelector('[data-leave-fraction]');
    const rights=Math.max(0,Number(rightsInput?.value)||0);
-   const fraction=Math.max(0,Number(fractionInput?.value)||0);
+   const employee=row.dataset.leaveRow;
+   // Le calcul automatique dépend du droit saisi : on le met temporairement à jour
+   // pour que l'affichage réagisse immédiatement avant même l'enregistrement.
+   const period=el('leavePeriod')?.value;
+   const saved=state.settings.paidLeaveRights?.[period]?.[employee];
+   state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
+   state.settings.paidLeaveRights[period]=state.settings.paidLeaveRights[period]||{};
+   state.settings.paidLeaveRights[period][employee]=rights;
+   const info=leaveFractionInfo(period,employee);
+   const fraction=info.days;
+   const auto=row.querySelector('[data-leave-fraction-auto]');
+   if(auto)auto.textContent=`${fraction} j`;
+   const infoNode=auto?.nextElementSibling;
+   if(infoNode)infoNode.textContent=info.reason;
+   if(saved===undefined)delete state.settings.paidLeaveRights[period][employee];
+   else state.settings.paidLeaveRights[period][employee]=saved;
    const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
    const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
    const available=rights+fraction-taken;
@@ -1656,7 +1746,7 @@ function recalcPaidLeaveFromInputs(){
  const row=[...document.querySelectorAll('#leaveBody tr[data-leave-row]')].find(r=>r.dataset.leaveRow===employee);
  if(row){
    const rights=Math.max(0,Number(row.querySelector('[data-leave-right]')?.value)||0);
-   const fraction=Math.max(0,Number(row.querySelector('[data-leave-fraction]')?.value)||0);
+   const fraction=Number(row.querySelector('[data-leave-fraction-auto]')?.textContent)||0;
    const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
    const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
    const available=rights+fraction-taken,after=available-planned;
@@ -1684,9 +1774,6 @@ async function saveLeaveRights(){
    state.settings.paidLeaveRights[period][inp.dataset.leaveRight]=Math.max(0,Number(inp.value)||0);
  });
 
- document.querySelectorAll('[data-leave-fraction]').forEach(inp=>{
-   state.settings.paidLeaveFractionnement[period][inp.dataset.leaveFraction]=Math.max(0,Number(inp.value)||0);
- });
 
  persist();
 
@@ -1694,12 +1781,12 @@ async function saveLeaveRights(){
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
    renderPaidLeave();
-   alert('Droits acquis et jours de fractionnement enregistrés.');
+   alert('Droits acquis enregistrés. Le fractionnement est calculé automatiquement.');
  }catch(err){
    console.error(err);
    setSyncStatus('Congés sauvegardés localement',false);
    renderPaidLeave();
-   alert('Droits enregistrés sur cet appareil. La synchronisation reprendra dès que possible.');
+   alert('Droits enregistrés sur cet appareil. Le fractionnement reste calculé automatiquement.');
  }
 }
 
