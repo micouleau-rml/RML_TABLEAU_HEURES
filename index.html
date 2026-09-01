@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V20</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V21</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -554,7 +554,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V20</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V21</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1343,11 +1343,22 @@ function leavePeriodLabel(key){
 function initLeavePeriods(){
  const sel=el('leavePeriod');
  if(!sel)return;
+
+ // Conserver la période actuellement choisie lors du rafraîchissement du tableau.
+ const previousValue=sel.value;
+
  const current=Number(leavePeriodKeyForDate(todayIso()));
  const existing=new Set(Object.keys(state.settings.paidLeaveRights||{}).map(Number).filter(Number.isFinite));
  for(let y=current-3;y<=current+2;y++)existing.add(y);
- sel.innerHTML=[...existing].sort((a,b)=>b-a).map(y=>`<option value="${y}">${leavePeriodLabel(y)}</option>`).join('');
- if(!sel.value)sel.value=String(current);
+
+ const years=[...existing].sort((a,b)=>b-a);
+ sel.innerHTML=years.map(y=>`<option value="${y}">${leavePeriodLabel(y)}</option>`).join('');
+
+ if(previousValue && years.map(String).includes(String(previousValue))){
+   sel.value=String(previousValue);
+ }else{
+   sel.value=String(current);
+ }
 }
 function leaveRights(period,employee){
  return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
