@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V21</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V22</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -474,8 +474,10 @@ header .wrap{position:relative;z-index:1}
 
   <div class="leave-summary">
    <div class="kpi"><span>Droits acquis</span><b id="leaveTotalRights">0 j</b></div>
+   <div class="kpi"><span>Fractionnement</span><b id="leaveTotalFraction">0 j</b></div>
    <div class="kpi"><span>Congés pris</span><b id="leaveTotalTaken">0 j</b></div>
    <div class="kpi"><span>Congés planifiés</span><b id="leaveTotalPlanned">0 j</b></div>
+   <div class="kpi"><span>Solde disponible</span><b id="leaveTotalAvailable">0 j</b></div>
    <div class="kpi"><span>Solde après planifiés</span><b id="leaveTotalBalance">0 j</b></div>
   </div>
 
@@ -485,6 +487,7 @@ header .wrap{position:relative;z-index:1}
      <tr>
       <th>Salarié</th>
       <th>Droits acquis</th>
+      <th>Jours de fractionnement</th>
       <th>Congés pris</th>
       <th>Congés planifiés</th>
       <th>Solde disponible</th>
@@ -554,7 +557,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V21</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V22</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -577,7 +580,8 @@ function normalizeSettings(raw){
    overtime:{rate1:10,rate2:25,thresholdHours:4},
    teams:[],
    monthlyReports:{},
-   paidLeaveRights:{}
+   paidLeaveRights:{},
+   paidLeaveFractionnement:{}
  };
  const s=(raw&&typeof raw==='object')?raw:{};
  return {
@@ -589,7 +593,8 @@ function normalizeSettings(raw){
    overtime:{...base.overtime,...(s.overtime||{})},
    teams:Array.isArray(s.teams)?s.teams:[],
    monthlyReports:(s.monthlyReports&&typeof s.monthlyReports==='object')?s.monthlyReports:{},
-   paidLeaveRights:(s.paidLeaveRights&&typeof s.paidLeaveRights==='object')?s.paidLeaveRights:{}
+   paidLeaveRights:(s.paidLeaveRights&&typeof s.paidLeaveRights==='object')?s.paidLeaveRights:{},
+   paidLeaveFractionnement:(s.paidLeaveFractionnement&&typeof s.paidLeaveFractionnement==='object')?s.paidLeaveFractionnement:{}
  };
 }
 
@@ -1363,6 +1368,9 @@ function initLeavePeriods(){
 function leaveRights(period,employee){
  return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
 }
+function leaveFraction(period,employee){
+ return Number(state.settings.paidLeaveFractionnement?.[period]?.[employee])||0
+}
 function leaveEntriesForPeriod(period,employee=''){
  const {start,end}=leavePeriodBounds(period);
  return state.entries.filter(e=>
@@ -1375,33 +1383,35 @@ function renderPaidLeave(){
  initLeavePeriods();
  const period=el('leavePeriod')?.value;
  if(!period)return;
-
  const today=todayIso();
- let totalRights=0,totalTaken=0,totalPlanned=0,totalBalance=0;
-
+ let totalRights=0,totalFraction=0,totalTaken=0,totalPlanned=0,totalAvailable=0,totalBalance=0;
  el('leaveBody').innerHTML=state.employees.map(emp=>{
    const rights=leaveRights(period,emp.name);
+   const fraction=leaveFraction(period,emp.name);
    const rows=leaveEntriesForPeriod(period,emp.name);
    const taken=rows.filter(e=>e.date<=today).length;
    const planned=rows.filter(e=>e.date>today).length;
-   const available=rights-taken;
-   const after=rights-taken-planned;
-   totalRights+=rights;totalTaken+=taken;totalPlanned+=planned;totalBalance+=after;
+   const available=rights+fraction-taken;
+   const after=available-planned;
+   totalRights+=rights;totalFraction+=fraction;totalTaken+=taken;totalPlanned+=planned;totalAvailable+=available;totalBalance+=after;
    const cls=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive';
    return `<tr>
     <td><b>${esc(emp.name)}</b></td>
     <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-right="${esc(emp.name)}" value="${rights}"> j</td>
+    <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-fraction="${esc(emp.name)}" value="${fraction}"> j</td>
     <td><b>${taken} j</b></td>
     <td>${planned} j</td>
-    <td>${available} j</td>
+    <td><b>${available} j</b></td>
     <td class="${cls}">${after} j</td>
    </tr>`
  }).join('');
-
  el('leaveTotalRights').textContent=`${totalRights} j`;
+ if(el('leaveTotalFraction'))el('leaveTotalFraction').textContent=`${totalFraction} j`;
  el('leaveTotalTaken').textContent=`${totalTaken} j`;
  el('leaveTotalPlanned').textContent=`${totalPlanned} j`;
+ if(el('leaveTotalAvailable'))el('leaveTotalAvailable').textContent=`${totalAvailable} j`;
  el('leaveTotalBalance').textContent=`${totalBalance} j`;
+ if(el('leaveTotalAvailable'))el('leaveTotalAvailable').className=totalAvailable<0?'leave-negative':totalAvailable<=3?'leave-warning':'leave-positive';
  el('leaveTotalBalance').className=totalBalance<0?'leave-negative':totalBalance<=3?'leave-warning':'leave-positive';
 
  const details=leaveEntriesForPeriod(period);
@@ -1413,20 +1423,26 @@ function renderPaidLeave(){
     <td>${esc(e.comment||'')}</td>
    </tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun congé CGE saisi sur cette période.</td></tr>`;
 }
+
 async function saveLeaveRights(){
  const period=el('leavePeriod')?.value;
  if(!period)return;
  state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
  state.settings.paidLeaveRights[period]=state.settings.paidLeaveRights[period]||{};
+ state.settings.paidLeaveFractionnement=state.settings.paidLeaveFractionnement||{};
+ state.settings.paidLeaveFractionnement[period]=state.settings.paidLeaveFractionnement[period]||{};
  document.querySelectorAll('[data-leave-right]').forEach(inp=>{
    state.settings.paidLeaveRights[period][inp.dataset.leaveRight]=Math.max(0,Number(inp.value)||0)
+ });
+ document.querySelectorAll('[data-leave-fraction]').forEach(inp=>{
+   state.settings.paidLeaveFractionnement[period][inp.dataset.leaveFraction]=Math.max(0,Number(inp.value)||0)
  });
  persist();
  renderPaidLeave();
  try{
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
-   alert('Droits de congés enregistrés et synchronisés.');
+   alert('Droits et jours de fractionnement enregistrés et synchronisés.');
  }catch(err){
    console.error(err);
    setSyncStatus('Congés sauvegardés localement',false);
