@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V28</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V29</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -460,7 +460,7 @@ header .wrap{position:relative;z-index:1}
    <div class="field">
     <label>Période de suivi</label>
     <select id="leavePeriod"></select>
-    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Pour les congés payés, les samedis sont décomptés ; les dimanches et jours fériés légaux sont exclus. Les anciennes périodes sont recalculées sur toute leur durée, y compris lorsqu’un vendredi férié précède un samedi.</div>
+    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Pour les congés payés, les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus.</div>
    </div>
    <div class="field">
     <label>Salarié affiché dans le résumé</label>
@@ -566,7 +566,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V28</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V29</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1441,7 +1441,6 @@ function leaveFraction(period,employee){
 }
 function leaveEntriesForPeriod(period,employee=''){
  const {start,end}=leavePeriodBounds(period);
-
  const employees=employee?[employee]:state.employees.map(e=>e.name);
  const result=[];
 
@@ -1451,103 +1450,100 @@ function leaveEntriesForPeriod(period,employee=''){
        e.type==='CGE' &&
        e.employee===empName &&
        e.date>=start && e.date<=end &&
-       !isFrenchPublicHoliday(e.date) &&
-       new Date(e.date+'T12:00:00').getDay()!==0
+       new Date(e.date+'T12:00:00').getDay()!==0 &&
+       !isFrenchPublicHoliday(e.date)
      )
      .sort((a,b)=>a.date.localeCompare(b.date));
+
+   if(!actual.length)continue;
 
    const seen=new Set(actual.map(e=>e.date));
    result.push(...actual);
 
-   if(!actual.length)continue;
-
-   // Reconstituer les périodes continues de congé à partir des jours CGE existants.
-   // On considère qu'une période continue peut traverser un dimanche ou un jour férié.
+   // Regrouper les jours CGE en périodes continues.
+   const spans=[];
    let spanStart=actual[0].date;
    let spanEnd=actual[0].date;
-
-   const flushSpan=(a,b)=>{
-     const da=new Date(a+'T12:00:00');
-     const db=new Date(b+'T12:00:00');
-
-     for(let d=new Date(da);d<=db;d.setDate(d.getDate()+1)){
-       const iso=isoLocalDate(d);
-       const dow=d.getDay();
-
-       // En jours ouvrables BTP : lundi à samedi sont décomptés,
-       // sauf jours fériés. Le dimanche n'est jamais décompté.
-       if(dow!==0 && !isFrenchPublicHoliday(iso) && !seen.has(iso)){
-         const worked=state.entries.some(x=>
-           x.employee===empName &&
-           x.date===iso &&
-           x.type!=='CGE' &&
-           ['CONT','CLA','SAM','FORM'].includes(x.type)
-         );
-
-         if(!worked){
-           result.push({
-             id:`auto-cge-${empName}-${iso}`,
-             employee:empName,
-             date:iso,
-             type:'CGE',
-             comment:dow===6?'Samedi décompté automatiquement':'Jour de congé reconstitué automatiquement',
-             _autoSaturday:dow===6,
-             _autoRebuilt:true
-           });
-           seen.add(iso);
-         }
-       }
-     }
-   };
 
    for(let i=1;i<actual.length;i++){
      const prev=new Date(actual[i-1].date+'T12:00:00');
      const cur=new Date(actual[i].date+'T12:00:00');
-
-     // Nombre de jours calendaires entre les deux jours CGE.
      const diff=Math.round((cur-prev)/86400000);
 
-     // Les coupures de 1 à 3 jours peuvent correspondre à samedi/dimanche/jour férié.
-     // Au-delà, on considère qu'il s'agit d'une nouvelle période de congé.
+     // Une coupure jusqu'à 3 jours peut être due à samedi/dimanche/jour férié.
      if(diff<=3){
        spanEnd=actual[i].date;
      }else{
-       flushSpan(spanStart,spanEnd);
+       spans.push([spanStart,spanEnd]);
        spanStart=actual[i].date;
        spanEnd=actual[i].date;
      }
    }
-   flushSpan(spanStart,spanEnd);
+   spans.push([spanStart,spanEnd]);
 
-   // Cas important : si la période se termine un vendredi férié ou juste avant un samedi,
-   // on doit inclure le samedi tant que la reprise n'est pas enregistrée ce jour-là.
-   const lastActual=actual[actual.length-1];
-   const lastDate=new Date(lastActual.date+'T12:00:00');
+   for(const [a,b] of spans){
+     const da=new Date(a+'T12:00:00');
+     const db=new Date(b+'T12:00:00');
 
-   // Chercher jusqu'au samedi qui suit immédiatement la fin de la période.
-   for(let add=1;add<=2;add++){
-     const d=addDaysDate(lastDate,add);
-     const iso=isoLocalDate(d);
-     if(iso>end)break;
+     // Compléter tous les jours ouvrables lundi-samedi au milieu de la période.
+     for(let d=new Date(da);d<=db;d.setDate(d.getDate()+1)){
+       const iso=isoLocalDate(d);
+       const dow=d.getDay();
+       if(dow===0 || isFrenchPublicHoliday(iso) || seen.has(iso))continue;
 
-     if(d.getDay()===6 && !isFrenchPublicHoliday(iso) && !seen.has(iso)){
        const worked=state.entries.some(x=>
          x.employee===empName &&
          x.date===iso &&
          x.type!=='CGE' &&
          ['CONT','CLA','SAM','FORM'].includes(x.type)
        );
+
        if(!worked){
          result.push({
-           id:`auto-sat-${empName}-${iso}`,
+           id:`auto-cge-${empName}-${iso}`,
            employee:empName,
            date:iso,
            type:'CGE',
-           comment:'Samedi décompté automatiquement',
-           _autoSaturday:true,
+           comment:dow===6?'Samedi décompté automatiquement':'Jour de congé reconstitué automatiquement',
+           _autoSaturday:dow===6,
            _autoRebuilt:true
          });
          seen.add(iso);
+       }
+     }
+
+     // IMPORTANT : le dernier samedi avant la reprise doit être décompté.
+     // On cherche le premier samedi qui suit la fin de la période,
+     // jusqu'à 6 jours maximum, sans franchir une journée de travail enregistrée.
+     let probe=new Date(db);
+     for(let i=1;i<=6;i++){
+       probe=addDaysDate(db,i);
+       const iso=isoLocalDate(probe);
+       if(iso>end)break;
+
+       const worked=state.entries.some(x=>
+         x.employee===empName &&
+         x.date===iso &&
+         x.type!=='CGE' &&
+         ['CONT','CLA','SAM','FORM'].includes(x.type)
+       );
+
+       if(worked)break;
+
+       if(probe.getDay()===6){
+         if(!isFrenchPublicHoliday(iso) && !seen.has(iso)){
+           result.push({
+             id:`auto-last-sat-${empName}-${iso}`,
+             employee:empName,
+             date:iso,
+             type:'CGE',
+             comment:'Dernier samedi de congé décompté automatiquement',
+             _autoSaturday:true,
+             _autoRebuilt:true
+           });
+           seen.add(iso);
+         }
+         break;
        }
      }
    }
