@@ -315,6 +315,20 @@ header .wrap{position:relative;z-index:1}
 }
 </style>
 
+
+<style id="v20-paid-leave">
+.leave-positive{color:#166534;font-weight:900}
+.leave-warning{color:#b45309;font-weight:900}
+.leave-negative{color:#b42318;font-weight:900}
+.leave-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+.leave-summary .kpi b{font-size:22px}
+.leave-right-input{min-width:90px;max-width:115px}
+.leave-period-help{margin-top:8px}
+@media(max-width:760px){
+ .leave-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+
 </head>
 <body>
 <header>
@@ -332,11 +346,12 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V19</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V20</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
   <button class="tab" data-view="recap">Récapitulatif</button>
+  <button class="tab" data-view="conges">Congés payés</button>
   <button class="tab" data-view="reglages">Réglages</button>
  </nav>
 </header>
@@ -437,6 +452,62 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 
+
+<section id="conges" class="view">
+ <div class="card">
+  <h2>Congés payés — suivi BTP</h2>
+  <div class="grid grid3">
+   <div class="field">
+    <label>Période de suivi</label>
+    <select id="leavePeriod"></select>
+    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Les jours CGE déjà saisis dans RML HEURES alimentent automatiquement ce tableau.</div>
+   </div>
+   <div class="field">
+    <label>&nbsp;</label>
+    <button type="button" class="primary" id="saveLeaveRights">Enregistrer les droits</button>
+   </div>
+   <div class="field">
+    <label>&nbsp;</label>
+    <button type="button" class="secondary" id="printLeave">Imprimer / PDF</button>
+   </div>
+  </div>
+
+  <div class="leave-summary">
+   <div class="kpi"><span>Droits acquis</span><b id="leaveTotalRights">0 j</b></div>
+   <div class="kpi"><span>Congés pris</span><b id="leaveTotalTaken">0 j</b></div>
+   <div class="kpi"><span>Congés planifiés</span><b id="leaveTotalPlanned">0 j</b></div>
+   <div class="kpi"><span>Solde après planifiés</span><b id="leaveTotalBalance">0 j</b></div>
+  </div>
+
+  <div class="table-wrap">
+   <table>
+    <thead>
+     <tr>
+      <th>Salarié</th>
+      <th>Droits acquis</th>
+      <th>Congés pris</th>
+      <th>Congés planifiés</th>
+      <th>Solde disponible</th>
+      <th>Solde après planifiés</th>
+     </tr>
+    </thead>
+    <tbody id="leaveBody"></tbody>
+   </table>
+  </div>
+
+  <div style="margin-top:18px">
+   <h3>Détail des congés saisis</h3>
+   <div class="muted" style="margin-bottom:10px">Les dates futures saisies en type CGE sont classées automatiquement dans « Congés planifiés ».</div>
+   <div class="table-wrap">
+    <table>
+     <thead><tr><th>Date</th><th>Salarié</th><th>Statut</th><th>Commentaire</th></tr></thead>
+     <tbody id="leaveDetailBody"></tbody>
+    </table>
+   </div>
+  </div>
+ </div>
+</section>
+
 <section id="reglages" class="view">
  <div class="grid grid2">
   <div class="card">
@@ -483,7 +554,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V19</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V20</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -505,7 +576,8 @@ function normalizeSettings(raw){
    SAM:{start:'07:00',end:'14:00'},
    overtime:{rate1:10,rate2:25,thresholdHours:4},
    teams:[],
-   monthlyReports:{}
+   monthlyReports:{},
+   paidLeaveRights:{}
  };
  const s=(raw&&typeof raw==='object')?raw:{};
  return {
@@ -516,7 +588,8 @@ function normalizeSettings(raw){
    SAM:{...base.SAM,...(s.SAM||{})},
    overtime:{...base.overtime,...(s.overtime||{})},
    teams:Array.isArray(s.teams)?s.teams:[],
-   monthlyReports:(s.monthlyReports&&typeof s.monthlyReports==='object')?s.monthlyReports:{}
+   monthlyReports:(s.monthlyReports&&typeof s.monthlyReports==='object')?s.monthlyReports:{},
+   paidLeaveRights:(s.paidLeaveRights&&typeof s.paidLeaveRights==='object')?s.paidLeaveRights:{}
  };
 }
 
@@ -553,7 +626,7 @@ async function syncFromCloud(){if(!navigator.onLine){setSyncStatus('Hors ligne �
 }else{
   state.settings=normalizeSettings(state.settings);
   await pushSettings();
-}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();ensureEmployeePlaceholder();renderSettings();updateCalc();renderMonth();renderRecap();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){
+}if(tr.data&&tr.data.length){state.entries=tr.data.map(rowToEntry)}else if(state.entries.length){await pushAllEntries()}persist();options();ensureEmployeePlaceholder();renderSettings();updateCalc();renderMonth();renderRecap();renderPaidLeave();setSyncStatus('Supabase synchronisé ✓');return true}catch(err){
  console.error('Erreur synchronisation Supabase :',err);
  setSyncStatus('Erreur synchro — données locales conservées',false,err?.message||String(err));
  return false
@@ -697,7 +770,7 @@ async function saveEntry(){
    }
  }
 
- persist();clearForm();renderMonth();renderRecap();
+ persist();clearForm();renderMonth();renderRecap();renderPaidLeave();
  try{
    await Promise.all(saved.map(pushEntry));
    setSyncStatus('Supabase synchronisé ✓');
@@ -739,7 +812,7 @@ function clearForm(){
  if(typeof updateTeamSummary==='function')updateTeamSummary();
 }
 function editEntry(id){const e=state.entries.find(x=>x.id===id);if(!e)return;editId=id;['employee','date','type','startOverride','depart','arrivee','deduction','comment'].forEach(k=>{if(el(k))el(k).value=e[k]||''});el('saveBtn').textContent='Enregistrer les modifications';show('saisie');updateCalc();window.scrollTo({top:0,behavior:'smooth'})}
-async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
+async function delEntry(id){if(!confirm('Supprimer cette journée ?'))return;const e=state.entries.find(x=>x.id===id);state.entries=state.entries.filter(x=>x.id!==id);persist();renderMonth();renderRecap();renderPaidLeave();if(e&&navigator.onLine){const {error}=await db.from('rml_heures_entries').delete().eq('entry_date',e.date).eq('employee_name',e.employee);if(error){console.error(error);setSyncStatus('Suppression locale — synchro à vérifier',false)}else setSyncStatus('Supabase synchronisé ✓')}}
 function panierForEntry(e){return ['CONT','CLA','SAM','FORM'].includes(e?.type)?1:0}
 
 
@@ -1250,11 +1323,111 @@ function renderRecap(){
  }).join('');
  renderReports();optimizeRecapColumns();applyMoneyVisibility()
 }
+
+function todayIso(){
+ return new Date().toISOString().slice(0,10)
+}
+function leavePeriodKeyForDate(date){
+ if(!date)return '';
+ const y=Number(date.slice(0,4)),m=Number(date.slice(5,7));
+ return String(m>=4?y:y-1)
+}
+function leavePeriodBounds(key){
+ const y=Number(key);
+ return {start:`${y}-04-01`,end:`${y+1}-03-31`}
+}
+function leavePeriodLabel(key){
+ const b=leavePeriodBounds(key);
+ return `01/04/${key} → 31/03/${Number(key)+1}`
+}
+function initLeavePeriods(){
+ const sel=el('leavePeriod');
+ if(!sel)return;
+ const current=Number(leavePeriodKeyForDate(todayIso()));
+ const existing=new Set(Object.keys(state.settings.paidLeaveRights||{}).map(Number).filter(Number.isFinite));
+ for(let y=current-3;y<=current+2;y++)existing.add(y);
+ sel.innerHTML=[...existing].sort((a,b)=>b-a).map(y=>`<option value="${y}">${leavePeriodLabel(y)}</option>`).join('');
+ if(!sel.value)sel.value=String(current);
+}
+function leaveRights(period,employee){
+ return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
+}
+function leaveEntriesForPeriod(period,employee=''){
+ const {start,end}=leavePeriodBounds(period);
+ return state.entries.filter(e=>
+   e.type==='CGE' &&
+   e.date>=start && e.date<=end &&
+   (!employee || e.employee===employee)
+ ).sort((a,b)=>a.date.localeCompare(b.date)||a.employee.localeCompare(b.employee))
+}
+function renderPaidLeave(){
+ initLeavePeriods();
+ const period=el('leavePeriod')?.value;
+ if(!period)return;
+
+ const today=todayIso();
+ let totalRights=0,totalTaken=0,totalPlanned=0,totalBalance=0;
+
+ el('leaveBody').innerHTML=state.employees.map(emp=>{
+   const rights=leaveRights(period,emp.name);
+   const rows=leaveEntriesForPeriod(period,emp.name);
+   const taken=rows.filter(e=>e.date<=today).length;
+   const planned=rows.filter(e=>e.date>today).length;
+   const available=rights-taken;
+   const after=rights-taken-planned;
+   totalRights+=rights;totalTaken+=taken;totalPlanned+=planned;totalBalance+=after;
+   const cls=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive';
+   return `<tr>
+    <td><b>${esc(emp.name)}</b></td>
+    <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-right="${esc(emp.name)}" value="${rights}"> j</td>
+    <td><b>${taken} j</b></td>
+    <td>${planned} j</td>
+    <td>${available} j</td>
+    <td class="${cls}">${after} j</td>
+   </tr>`
+ }).join('');
+
+ el('leaveTotalRights').textContent=`${totalRights} j`;
+ el('leaveTotalTaken').textContent=`${totalTaken} j`;
+ el('leaveTotalPlanned').textContent=`${totalPlanned} j`;
+ el('leaveTotalBalance').textContent=`${totalBalance} j`;
+ el('leaveTotalBalance').className=totalBalance<0?'leave-negative':totalBalance<=3?'leave-warning':'leave-positive';
+
+ const details=leaveEntriesForPeriod(period);
+ el('leaveDetailBody').innerHTML=details.length?details.map(e=>`
+   <tr>
+    <td>${new Date(e.date+'T12:00:00').toLocaleDateString('fr-FR')}</td>
+    <td><b>${esc(e.employee)}</b></td>
+    <td><span class="badge CGE">${e.date>today?'Planifié':'Pris'}</span></td>
+    <td>${esc(e.comment||'')}</td>
+   </tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun congé CGE saisi sur cette période.</td></tr>`;
+}
+async function saveLeaveRights(){
+ const period=el('leavePeriod')?.value;
+ if(!period)return;
+ state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
+ state.settings.paidLeaveRights[period]=state.settings.paidLeaveRights[period]||{};
+ document.querySelectorAll('[data-leave-right]').forEach(inp=>{
+   state.settings.paidLeaveRights[period][inp.dataset.leaveRight]=Math.max(0,Number(inp.value)||0)
+ });
+ persist();
+ renderPaidLeave();
+ try{
+   await pushSettings();
+   setSyncStatus('Supabase synchronisé ✓');
+   alert('Droits de congés enregistrés et synchronisés.');
+ }catch(err){
+   console.error(err);
+   setSyncStatus('Congés sauvegardés localement',false);
+   alert('Droits enregistrés localement. La synchronisation reprendra dès que possible.');
+ }
+}
+
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;renderEmployeeSettings();renderTeamSettings()}
 function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
 function removeEmployee(i){state.employees.splice(i,1);renderEmployeeSettings()}
 function addEmployee(){state.employees.push({name:'NOUVEAU SALARIÉ',rate:0});renderEmployeeSettings()}
-async function saveEmployees(){document.querySelectorAll('[data-n]').forEach(x=>state.employees[+x.dataset.n].name=x.value.trim());document.querySelectorAll('[data-r]').forEach(x=>state.employees[+x.dataset.r].rate=Number(x.value)||0);state.employees=state.employees.filter(e=>e.name);persist();options();renderTeamPicker();renderTeamSettings();renderMonth();renderRecap();try{await pushEmployees();setSyncStatus('Supabase synchronisé ✓');alert('Salariés enregistrés et synchronisés.')}catch(err){console.error(err);setSyncStatus('Salariés sauvegardés localement',false);alert('Salariés enregistrés localement.')}}
+async function saveEmployees(){document.querySelectorAll('[data-n]').forEach(x=>state.employees[+x.dataset.n].name=x.value.trim());document.querySelectorAll('[data-r]').forEach(x=>state.employees[+x.dataset.r].rate=Number(x.value)||0);state.employees=state.employees.filter(e=>e.name);persist();options();renderTeamPicker();renderTeamSettings();renderMonth();renderRecap();renderPaidLeave();try{await pushEmployees();setSyncStatus('Supabase synchronisé ✓');alert('Salariés enregistrés et synchronisés.')}catch(err){console.error(err);setSyncStatus('Salariés sauvegardés localement',false);alert('Salariés enregistrés localement.')}}
 async function saveSettings(){state.settings.CONT={start:el('contStart').value,end:el('contEnd').value};state.settings.CLA={start:el('claStart').value,end:el('claEnd').value,pauseStart:el('pauseStart').value,pauseEnd:el('pauseEnd').value};state.settings.SAM={start:el('samStart').value,end:state.settings.SAM.end||'14:00'};state.settings.overtime={rate1:Number(el('otRate1').value)||0,rate2:Number(el('otRate2').value)||0,thresholdHours:Number(el('otThreshold').value)||0};persist();updateCalc();renderRecap();try{await pushSettings();setSyncStatus('Supabase synchronisé ✓');alert('Réglages enregistrés et synchronisés.')}catch(err){console.error(err);setSyncStatus('Réglages sauvegardés localement',false);alert('Réglages enregistrés localement.')}}
 
 function teamMode(on){
@@ -1422,7 +1595,7 @@ function ensureEmployeePlaceholder(){
  if(!sel.value)sel.value='';
 }
 
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='reglages')renderSettings()}
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='conges')renderPaidLeave();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier ou atelier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
 el('type')?.addEventListener('input',updateCalc);
@@ -1446,8 +1619,11 @@ if(el('toggleTeamSettings')){
  };
  const collapsed=localStorage.getItem('rml_team_settings_collapsed')==='1';
  if(collapsed){el('teamSettingsPanel').classList.add('collapsed');el('toggleTeamSettings').textContent='Ouvrir'}
-}el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
-options();ensureEmployeePlaceholder();setToday();if(el('employee'))el('employee').value='';renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();syncFromCloud();
+}if(el('leavePeriod'))el('leavePeriod').onchange=renderPaidLeave;
+if(el('saveLeaveRights'))el('saveLeaveRights').onclick=saveLeaveRights;
+if(el('printLeave'))el('printLeave').onclick=()=>window.print();
+el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
+options();ensureEmployeePlaceholder();setToday();if(el('employee'))el('employee').value='';renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();renderPaidLeave();syncFromCloud();
 </script>
 
 
