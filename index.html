@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V24</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V26</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -415,7 +415,7 @@ header .wrap{position:relative;z-index:1}
 
 <section id="mois" class="view">
  <div class="card">
-  <div class="grid grid3">
+  <div class="grid grid3" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
    <div class="field"><label>Salarié</label><select id="monthEmployee"></select></div>
    <div class="field"><label>Mois</label><input id="monthPick" type="month"></div>
    <div class="field"><label>&nbsp;</label><button class="secondary" id="exportCsv">Exporter CSV</button></div>
@@ -460,7 +460,11 @@ header .wrap{position:relative;z-index:1}
    <div class="field">
     <label>Période de suivi</label>
     <select id="leavePeriod"></select>
-    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Pour les congés payés, les samedis sont décomptés ; les dimanches et jours fériés légaux sont exclus. Les jours CGE saisis dans RML HEURES alimentent automatiquement ce tableau.</div>
+    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Pour les congés payés, les samedis sont décomptés ; les dimanches et jours fériés légaux sont exclus. Les anciens congés sont recalculés automatiquement : un samedi suivant un vendredi de congé est ajouté au décompte sauf s’il est férié ou travaillé.</div>
+   </div>
+   <div class="field">
+    <label>Salarié affiché dans le résumé</label>
+    <select id="leaveEmployee"></select>
    </div>
    <div class="field">
     <label>&nbsp;</label>
@@ -562,7 +566,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V24</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V26</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1437,16 +1441,93 @@ function leaveFraction(period,employee){
 }
 function leaveEntriesForPeriod(period,employee=''){
  const {start,end}=leavePeriodBounds(period);
- return state.entries.filter(e=>
+
+ // Jours CGE réellement présents dans l'historique.
+ const actual=state.entries.filter(e=>
    e.type==='CGE' &&
    e.date>=start && e.date<=end &&
    !isFrenchPublicHoliday(e.date) &&
    new Date(e.date+'T12:00:00').getDay()!==0 &&
    (!employee || e.employee===employee)
- ).sort((a,b)=>a.date.localeCompare(b.date)||a.employee.localeCompare(b.employee))
+ );
+
+ // Les anciennes versions n'enregistraient pas les samedis lors d'une période CGE.
+ // On les reconstitue donc automatiquement pour que l'historique soit juste.
+ const result=[...actual];
+ const seen=new Set(actual.map(e=>`${e.employee}|${e.date}`));
+
+ for(const e of actual){
+   const d=new Date(e.date+'T12:00:00');
+
+   // En jours ouvrables, lorsqu'un vendredi est en congé, le samedi qui suit
+   // est également décompté sauf jour férié ou journée réellement travaillée.
+   if(d.getDay()===5){
+     const saturday=addDaysDate(d,1);
+     const satIso=isoLocalDate(saturday);
+
+     if(satIso>=start && satIso<=end && !isFrenchPublicHoliday(satIso)){
+       const key=`${e.employee}|${satIso}`;
+       const workedSaturday=state.entries.some(x=>
+         x.employee===e.employee &&
+         x.date===satIso &&
+         x.type!=='CGE' &&
+         ['CONT','CLA','SAM','FORM'].includes(x.type)
+       );
+
+       if(!seen.has(key) && !workedSaturday){
+         result.push({
+           id:`auto-sat-${e.employee}-${satIso}`,
+           employee:e.employee,
+           date:satIso,
+           type:'CGE',
+           comment:'Samedi décompté automatiquement',
+           _autoSaturday:true
+         });
+         seen.add(key);
+       }
+     }
+   }
+ }
+
+ return result.sort((a,b)=>a.date.localeCompare(b.date)||a.employee.localeCompare(b.employee))
+}
+function initLeaveEmployee(){
+ const sel=el('leaveEmployee');
+ if(!sel)return;
+ const previous=sel.value;
+ sel.innerHTML=state.employees.map(emp=>`<option value="${esc(emp.name)}">${esc(emp.name)}</option>`).join('');
+ if(previous && state.employees.some(e=>e.name===previous))sel.value=previous;
+ else if(state.employees.length)sel.value=state.employees[0].name;
+}
+function updateLeaveSummaryForEmployee(){
+ const period=el('leavePeriod')?.value;
+ const employee=el('leaveEmployee')?.value;
+ if(!period||!employee)return;
+ const rights=leaveRights(period,employee);
+ const fraction=leaveFraction(period,employee);
+ const rows=leaveEntriesForPeriod(period,employee);
+ const today=todayIso();
+ const taken=rows.filter(e=>e.date<=today).length;
+ const planned=rows.filter(e=>e.date>today).length;
+ const available=rights+fraction-taken;
+ const after=available-planned;
+
+ el('leaveTotalRights').textContent=`${rights} j`;
+ if(el('leaveTotalFraction'))el('leaveTotalFraction').textContent=`${fraction} j`;
+ el('leaveTotalTaken').textContent=`${taken} j`;
+ el('leaveTotalPlanned').textContent=`${planned} j`;
+ if(el('leaveTotalAvailable')){
+   el('leaveTotalAvailable').textContent=`${available} j`;
+   el('leaveTotalAvailable').className=available<0?'leave-negative':available<=3?'leave-warning':'leave-positive';
+ }
+ if(el('leaveTotalBalance')){
+   el('leaveTotalBalance').textContent=`${after} j`;
+   el('leaveTotalBalance').className=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive';
+ }
 }
 function renderPaidLeave(){
  initLeavePeriods();
+ initLeaveEmployee();
  const period=el('leavePeriod')?.value;
  if(!period)return;
 
@@ -1485,54 +1566,45 @@ function renderPaidLeave(){
    <tr>
     <td>${new Date(e.date+'T12:00:00').toLocaleDateString('fr-FR')}</td>
     <td><b>${esc(e.employee)}</b></td>
-    <td><span class="badge CGE">${e.date>today?'Planifié':'Pris'}</span></td>
+    <td><span class="badge CGE">${e.date>today?'Planifié':'Pris'}</span>${e._autoSaturday?`<div class="muted" style="font-size:11px">Samedi décompté</div>`:''}</td>
     <td>${esc(e.comment||'')}</td>
    </tr>`).join(''):`<tr><td colspan="4" class="empty">Aucun congé CGE saisi sur cette période.</td></tr>`;
 }
 
 function recalcPaidLeaveFromInputs(){
- let totalRights=0,totalFraction=0,totalTaken=0,totalPlanned=0,totalAvailable=0,totalBalance=0;
-
  document.querySelectorAll('#leaveBody tr[data-leave-row]').forEach(row=>{
    const rightsInput=row.querySelector('[data-leave-right]');
    const fractionInput=row.querySelector('[data-leave-fraction]');
    const rights=Math.max(0,Number(rightsInput?.value)||0);
    const fraction=Math.max(0,Number(fractionInput?.value)||0);
-
    const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
    const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
-
    const available=rights+fraction-taken;
    const after=available-planned;
-
    const av=row.querySelector('[data-leave-available]');
    const af=row.querySelector('[data-leave-after]');
-
    if(av)av.innerHTML=`<b>${available} j</b>`;
    if(af){
      af.textContent=`${after} j`;
      af.className=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive';
    }
-
-   totalRights+=rights;
-   totalFraction+=fraction;
-   totalTaken+=taken;
-   totalPlanned+=planned;
-   totalAvailable+=available;
-   totalBalance+=after;
  });
-
- if(el('leaveTotalRights'))el('leaveTotalRights').textContent=`${totalRights} j`;
- if(el('leaveTotalFraction'))el('leaveTotalFraction').textContent=`${totalFraction} j`;
- if(el('leaveTotalTaken'))el('leaveTotalTaken').textContent=`${totalTaken} j`;
- if(el('leaveTotalPlanned'))el('leaveTotalPlanned').textContent=`${totalPlanned} j`;
- if(el('leaveTotalAvailable')){
-   el('leaveTotalAvailable').textContent=`${totalAvailable} j`;
-   el('leaveTotalAvailable').className=totalAvailable<0?'leave-negative':totalAvailable<=3?'leave-warning':'leave-positive';
- }
- if(el('leaveTotalBalance')){
-   el('leaveTotalBalance').textContent=`${totalBalance} j`;
-   el('leaveTotalBalance').className=totalBalance<0?'leave-negative':totalBalance<=3?'leave-warning':'leave-positive';
+ // Le résumé du haut correspond uniquement au salarié sélectionné.
+ // On lit les valeurs en cours de saisie de sa ligne pour un retour immédiat.
+ const employee=el('leaveEmployee')?.value;
+ const row=[...document.querySelectorAll('#leaveBody tr[data-leave-row]')].find(r=>r.dataset.leaveRow===employee);
+ if(row){
+   const rights=Math.max(0,Number(row.querySelector('[data-leave-right]')?.value)||0);
+   const fraction=Math.max(0,Number(row.querySelector('[data-leave-fraction]')?.value)||0);
+   const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
+   const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
+   const available=rights+fraction-taken,after=available-planned;
+   el('leaveTotalRights').textContent=`${rights} j`;
+   if(el('leaveTotalFraction'))el('leaveTotalFraction').textContent=`${fraction} j`;
+   el('leaveTotalTaken').textContent=`${taken} j`;
+   el('leaveTotalPlanned').textContent=`${planned} j`;
+   if(el('leaveTotalAvailable')){el('leaveTotalAvailable').textContent=`${available} j`;el('leaveTotalAvailable').className=available<0?'leave-negative':available<=3?'leave-warning':'leave-positive'}
+   if(el('leaveTotalBalance')){el('leaveTotalBalance').textContent=`${after} j`;el('leaveTotalBalance').className=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive'}
  }
 }
 
@@ -1767,6 +1839,7 @@ if(el('toggleTeamSettings')){
  const collapsed=localStorage.getItem('rml_team_settings_collapsed')==='1';
  if(collapsed){el('teamSettingsPanel').classList.add('collapsed');el('toggleTeamSettings').textContent='Ouvrir'}
 }if(el('leavePeriod'))el('leavePeriod').onchange=renderPaidLeave;
+if(el('leaveEmployee'))el('leaveEmployee').onchange=recalcPaidLeaveFromInputs;
 if(el('saveLeaveRights'))el('saveLeaveRights').onclick=async()=>{
  const b=el('saveLeaveRights'),old=b.textContent;
  b.disabled=true;b.textContent='Enregistrement…';
