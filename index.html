@@ -71,6 +71,81 @@ footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);b
  }
 }
 
+
+/* V33 — ligne salarié compacte et alignée */
+.employee-row{
+ display:grid !important;
+ grid-template-columns:minmax(210px,1.55fr) 105px 145px 82px !important;
+ gap:8px !important;
+ align-items:end !important;
+ padding:7px 0 !important;
+}
+.employee-row>div{
+ min-width:0 !important;
+}
+.employee-row label{
+ display:block !important;
+ margin-bottom:4px !important;
+ font-size:12px !important;
+ line-height:1.15 !important;
+}
+.employee-row input{
+ width:100% !important;
+ height:38px !important;
+ min-height:38px !important;
+ padding:7px 10px !important;
+ box-sizing:border-box !important;
+ font-size:14px !important;
+ border-radius:9px !important;
+}
+.employee-row input[type="date"]{
+ min-width:0 !important;
+ width:145px !important;
+}
+.employee-row .employee-delete-btn{
+ width:82px !important;
+ min-width:82px !important;
+ max-width:82px !important;
+ height:38px !important;
+ min-height:38px !important;
+ padding:0 8px !important;
+ margin:0 !important;
+ align-self:end !important;
+ border-radius:9px !important;
+ background:#fee2e2 !important;
+ color:#b91c1c !important;
+ border:1px solid #fecaca !important;
+ font-size:12px !important;
+ font-weight:700 !important;
+ line-height:1 !important;
+}
+.employee-row .employee-delete-btn:hover{
+ background:#fecaca !important;
+}
+
+@media(max-width:1000px){
+ .employee-row{
+  grid-template-columns:minmax(190px,1.45fr) 100px 138px 78px !important;
+  gap:7px !important;
+ }
+ .employee-row input[type="date"]{width:138px !important}
+ .employee-row .employee-delete-btn{
+  width:78px !important;
+  min-width:78px !important;
+  max-width:78px !important;
+  font-size:11px !important;
+ }
+}
+@media(max-width:720px){
+ .employee-row{
+  grid-template-columns:minmax(160px,1fr) 95px 132px !important;
+ }
+ .employee-row .employee-delete-btn{
+  grid-column:3 !important;
+  justify-self:end !important;
+ }
+}
+
 </style>
 <style>
 header{position:relative;overflow:hidden;background:radial-gradient(ellipse at 52% -35%,rgba(0,184,255,.82) 0%,rgba(0,184,255,.24) 31%,transparent 54%),radial-gradient(ellipse at 5% 12%,rgba(63,64,213,.72) 0%,rgba(63,64,213,.22) 35%,transparent 58%),linear-gradient(120deg,#173aa7 0%,#075fc9 48%,#123e9e 100%)!important}
@@ -396,7 +471,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V32</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V33</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -625,7 +700,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V32</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V33</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1910,7 +1985,7 @@ async function saveLeaveRights(){
 }
 
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;if(el('otGraceEnabled'))el('otGraceEnabled').checked=state.settings.overtime?.grace15Enabled!==false;renderEmployeeSettings();renderTeamSettings()}
-function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><div><label>Date d’entrée</label><input data-hire="${i}" type="date" value="${esc(employeeHireDate(e.name))}"><div class="muted" style="font-size:11px">Utilisée pour le calcul automatique CIBTP.</div></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
+function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><div><label>Date d’entrée</label><input data-hire="${i}" type="date" value="${esc(employeeHireDate(e.name))}"></div><button class="employee-delete-btn" type="button" onclick="removeEmployee(${i})">Supprimer</button></div>`).join('')}
 function removeEmployee(i){const name=state.employees[i]?.name;if(name&&state.settings.employeeHireDates)delete state.settings.employeeHireDates[name];state.employees.splice(i,1);renderEmployeeSettings()}
 function addEmployee(){state.employees.push({name:'NOUVEAU SALARIÉ',rate:0});renderEmployeeSettings()}
 async function saveEmployees(){
