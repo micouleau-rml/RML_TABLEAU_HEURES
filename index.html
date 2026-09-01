@@ -346,7 +346,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V30</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V31</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -460,15 +460,22 @@ header .wrap{position:relative;z-index:1}
    <div class="field">
     <label>Période de suivi</label>
     <select id="leavePeriod"></select>
-    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus. Le fractionnement est calculé automatiquement selon les règles CIBTP.</div>
+    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus. Le fractionnement est calculé automatiquement selon les règles CIBTP. Le calcul automatique des droits utilise la date d’entrée du salarié ; la caisse CIBTP reste la référence en cas de droits provenant d’un autre employeur BTP ou de situations particulières.</div>
    </div>
    <div class="field">
     <label>Salarié affiché dans le résumé</label>
     <select id="leaveEmployee"></select>
    </div>
    <div class="field">
+    <label>Calcul des droits acquis</label>
+    <label style="display:flex;gap:9px;align-items:center;padding:10px 12px;border:1px solid #d7deea;border-radius:10px;background:#f8fafc">
+     <input id="paidLeaveAutoRights" type="checkbox" style="width:auto">
+     <span><b>Calcul automatique CIBTP</b><br><span class="muted" style="font-size:11px">À partir de la date d’entrée, 2,5 j par tranche de 4 semaines, maximum 30 j.</span></span>
+    </label>
+   </div>
+   <div class="field">
     <label>&nbsp;</label>
-    <button type="button" class="primary" id="saveLeaveRights">Enregistrer les droits</button>
+    <button type="button" class="primary" id="saveLeaveRights">Enregistrer les droits / paramètres</button>
    </div>
    <div class="field">
     <label>&nbsp;</label>
@@ -538,7 +545,7 @@ header .wrap{position:relative;z-index:1}
    </label>
    <div class="actions"><button class="primary" id="saveSettings">Enregistrer les réglages</button><button class="secondary" id="syncNow">Synchroniser maintenant</button></div>
   </div>
-  <div class="card"><h2>Salariés et taux horaires</h2><div class="note" style="margin-bottom:12px">Le taux horaire est réglé individuellement pour chaque salarié et sert au calcul du montant des heures complémentaires.</div><div id="employeeSettings"></div><div class="actions"><button class="secondary" id="addEmployee">Ajouter un salarié</button><button class="primary" id="saveEmployees">Enregistrer les salariés</button></div>
+  <div class="card"><h2>Salariés et taux horaires</h2><div class="note" style="margin-bottom:12px">Le taux horaire est réglé individuellement pour chaque salarié. La <b>date d’entrée</b> sert au calcul automatique des droits à congés CIBTP. Le calcul automatique donne le droit légal théorique de l’entreprise ; les droits transférés d’un précédent employeur BTP ou certaines absences particulières doivent rester contrôlés avec le certificat CIBTP.</div><div id="employeeSettings"></div><div class="actions"><button class="secondary" id="addEmployee">Ajouter un salarié</button><button class="primary" id="saveEmployees">Enregistrer les salariés</button></div>
 <div class="team-settings" id="teamSettingsPanel">
  <div class="team-settings-header">
   <div>
@@ -568,7 +575,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V30</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V31</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -592,7 +599,9 @@ function normalizeSettings(raw){
    teams:[],
    monthlyReports:{},
    paidLeaveRights:{},
-   paidLeaveFractionnement:{}
+   paidLeaveFractionnement:{},
+   employeeHireDates:{},
+   paidLeaveAutoRights:true
  };
  const s=(raw&&typeof raw==='object')?raw:{};
  return {
@@ -605,7 +614,9 @@ function normalizeSettings(raw){
    teams:Array.isArray(s.teams)?s.teams:[],
    monthlyReports:(s.monthlyReports&&typeof s.monthlyReports==='object')?s.monthlyReports:{},
    paidLeaveRights:(s.paidLeaveRights&&typeof s.paidLeaveRights==='object')?s.paidLeaveRights:{},
-   paidLeaveFractionnement:(s.paidLeaveFractionnement&&typeof s.paidLeaveFractionnement==='object')?s.paidLeaveFractionnement:{}
+   paidLeaveFractionnement:(s.paidLeaveFractionnement&&typeof s.paidLeaveFractionnement==='object')?s.paidLeaveFractionnement:{},
+   employeeHireDates:(s.employeeHireDates&&typeof s.employeeHireDates==='object')?s.employeeHireDates:{},
+   paidLeaveAutoRights:s.paidLeaveAutoRights!==false
  };
 }
 
@@ -1435,7 +1446,40 @@ function initLeavePeriods(){
    sel.value=String(current);
  }
 }
+
+function employeeHireDate(employee){
+ return state.settings.employeeHireDates?.[employee]||''
+}
+function cibpAutoLegalRights(period,employee){
+ const hire=employeeHireDate(employee);
+ if(!hire)return null;
+
+ const y=Number(period);
+ // Période d'acquisition CIBTP : 1er avril N -> 31 mars N+1.
+ const start=`${y}-04-01`;
+ const end=`${y+1}-03-31`;
+ const calcEnd=todayIso()<end?todayIso():end;
+ const calcStart=hire>start?hire:start;
+
+ if(calcEnd<calcStart)return 0;
+
+ const a=new Date(calcStart+'T12:00:00');
+ const b=new Date(calcEnd+'T12:00:00');
+ // +1 car le premier jour de présence appartient à la période.
+ const calendarDays=Math.max(0,Math.floor((b-a)/86400000)+1);
+
+ // Base CIBTP : 2,5 jours par période de 4 semaines.
+ // L'arrondi à l'entier supérieur est appliqué au droit calculé.
+ let rights=Math.ceil((calendarDays/28)*2.5-1e-9);
+ rights=Math.max(0,Math.min(30,rights));
+ return rights;
+}
+
 function leaveRights(period,employee){
+ if(state.settings.paidLeaveAutoRights!==false){
+   const auto=cibpAutoLegalRights(period,employee);
+   if(auto!==null)return auto;
+ }
  return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
 }
 function fractionLeaveRows(period,employee){
@@ -1669,6 +1713,16 @@ function renderPaidLeave(){
  if(!period)return;
 
  const today=todayIso();
+ const autoRightsBox=el('paidLeaveAutoRights');
+ if(autoRightsBox){
+   autoRightsBox.checked=state.settings.paidLeaveAutoRights!==false;
+   autoRightsBox.onchange=async()=>{
+     state.settings.paidLeaveAutoRights=autoRightsBox.checked;
+     persist();
+     try{await pushSettings();setSyncStatus('Supabase synchronisé ✓')}catch(err){console.error(err);setSyncStatus('Paramètre sauvegardé localement',false)}
+     renderPaidLeave();
+   };
+ }
 
  el('leaveBody').innerHTML=state.employees.map(emp=>{
    const rights=leaveRights(period,emp.name);
@@ -1682,7 +1736,10 @@ function renderPaidLeave(){
 
    return `<tr data-leave-row="${esc(emp.name)}">
     <td><b>${esc(emp.name)}</b></td>
-    <td><input class="leave-right-input" type="number" min="0" step="0.5" data-leave-right="${esc(emp.name)}" value="${rights}"> j</td>
+    <td>${state.settings.paidLeaveAutoRights!==false
+ ? `<b data-leave-right-auto="${esc(emp.name)}">${rights} j</b><div class="muted" style="font-size:11px;margin-top:3px">${employeeHireDate(emp.name)?`Entrée : ${new Date(employeeHireDate(emp.name)+'T12:00:00').toLocaleDateString('fr-FR')}`:'Date d’entrée à renseigner'}</div>`
+ : `<input class="leave-right-input" type="number" min="0" step="0.5" data-leave-right="${esc(emp.name)}" value="${rights}"> j`
+}</td>
     <td><b data-leave-fraction-auto="${esc(emp.name)}">${fraction} j</b><div class="muted" style="font-size:11px;margin-top:3px">${esc(leaveFractionInfo(period,emp.name).reason)}</div></td>
     <td><b data-leave-taken>${taken} j</b></td>
     <td data-leave-planned>${planned} j</td>
@@ -1711,23 +1768,30 @@ function renderPaidLeave(){
 function recalcPaidLeaveFromInputs(){
  document.querySelectorAll('#leaveBody tr[data-leave-row]').forEach(row=>{
    const rightsInput=row.querySelector('[data-leave-right]');
-   const rights=Math.max(0,Number(rightsInput?.value)||0);
    const employee=row.dataset.leaveRow;
-   // Le calcul automatique dépend du droit saisi : on le met temporairement à jour
-   // pour que l'affichage réagisse immédiatement avant même l'enregistrement.
    const period=el('leavePeriod')?.value;
-   const saved=state.settings.paidLeaveRights?.[period]?.[employee];
-   state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
-   state.settings.paidLeaveRights[period]=state.settings.paidLeaveRights[period]||{};
-   state.settings.paidLeaveRights[period][employee]=rights;
+   const rights=state.settings.paidLeaveAutoRights!==false
+     ? leaveRights(period,employee)
+     : Math.max(0,Number(rightsInput?.value)||0);
+
+   let saved;
+   if(state.settings.paidLeaveAutoRights===false){
+     // Pour la saisie manuelle, le fractionnement réagit immédiatement au droit saisi.
+     saved=state.settings.paidLeaveRights?.[period]?.[employee];
+     state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
+     state.settings.paidLeaveRights[period]=state.settings.paidLeaveRights[period]||{};
+     state.settings.paidLeaveRights[period][employee]=rights;
+   }
    const info=leaveFractionInfo(period,employee);
    const fraction=info.days;
    const auto=row.querySelector('[data-leave-fraction-auto]');
    if(auto)auto.textContent=`${fraction} j`;
    const infoNode=auto?.nextElementSibling;
    if(infoNode)infoNode.textContent=info.reason;
-   if(saved===undefined)delete state.settings.paidLeaveRights[period][employee];
-   else state.settings.paidLeaveRights[period][employee]=saved;
+   if(state.settings.paidLeaveAutoRights===false){
+     if(saved===undefined)delete state.settings.paidLeaveRights[period][employee];
+     else state.settings.paidLeaveRights[period][employee]=saved;
+   }
    const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
    const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
    const available=rights+fraction-taken;
@@ -1745,7 +1809,9 @@ function recalcPaidLeaveFromInputs(){
  const employee=el('leaveEmployee')?.value;
  const row=[...document.querySelectorAll('#leaveBody tr[data-leave-row]')].find(r=>r.dataset.leaveRow===employee);
  if(row){
-   const rights=Math.max(0,Number(row.querySelector('[data-leave-right]')?.value)||0);
+   const rights=state.settings.paidLeaveAutoRights!==false
+     ? leaveRights(el('leavePeriod')?.value,employee)
+     : Math.max(0,Number(row.querySelector('[data-leave-right]')?.value)||0);
    const fraction=Number(row.querySelector('[data-leave-fraction-auto]')?.textContent)||0;
    const taken=parseFloat(row.querySelector('[data-leave-taken]')?.textContent)||0;
    const planned=parseFloat(row.querySelector('[data-leave-planned]')?.textContent)||0;
@@ -1763,6 +1829,7 @@ async function saveLeaveRights(){
  const period=el('leavePeriod')?.value;
  if(!period)return alert('Choisis une période de congés.');
 
+ state.settings.paidLeaveAutoRights=!!el('paidLeaveAutoRights')?.checked;
  recalcPaidLeaveFromInputs();
 
  state.settings.paidLeaveRights=state.settings.paidLeaveRights||{};
@@ -1781,7 +1848,9 @@ async function saveLeaveRights(){
    await pushSettings();
    setSyncStatus('Supabase synchronisé ✓');
    renderPaidLeave();
-   alert('Droits acquis enregistrés. Le fractionnement est calculé automatiquement.');
+   alert(state.settings.paidLeaveAutoRights!==false
+     ? 'Calcul automatique CIBTP enregistré. Les droits sont recalculés à partir des dates d’entrée.'
+     : 'Droits acquis enregistrés. Le fractionnement est calculé automatiquement.');
  }catch(err){
    console.error(err);
    setSyncStatus('Congés sauvegardés localement',false);
@@ -1791,10 +1860,38 @@ async function saveLeaveRights(){
 }
 
 function renderSettings(){el('contStart').value=state.settings.CONT.start;el('contEnd').value=state.settings.CONT.end;el('claStart').value=state.settings.CLA.start;el('claEnd').value=state.settings.CLA.end;el('pauseStart').value=state.settings.CLA.pauseStart;el('pauseEnd').value=state.settings.CLA.pauseEnd;el('samStart').value=state.settings.SAM.start;el('otRate1').value=state.settings.overtime.rate1;el('otRate2').value=state.settings.overtime.rate2;el('otThreshold').value=state.settings.overtime.thresholdHours;if(el('otGraceEnabled'))el('otGraceEnabled').checked=state.settings.overtime?.grace15Enabled!==false;renderEmployeeSettings();renderTeamSettings()}
-function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
-function removeEmployee(i){state.employees.splice(i,1);renderEmployeeSettings()}
+function renderEmployeeSettings(){el('employeeSettings').innerHTML=state.employees.map((e,i)=>`<div class="employee-row"><div><label>Nom</label><input data-n="${i}" value="${esc(e.name)}"></div><div><label>Taux horaire</label><input data-r="${i}" type="number" step="0.01" value="${e.rate||0}"></div><div><label>Date d’entrée</label><input data-hire="${i}" type="date" value="${esc(employeeHireDate(e.name))}"><div class="muted" style="font-size:11px">Utilisée pour le calcul automatique CIBTP.</div></div><button onclick="removeEmployee(${i})">×</button></div>`).join('')}
+function removeEmployee(i){const name=state.employees[i]?.name;if(name&&state.settings.employeeHireDates)delete state.settings.employeeHireDates[name];state.employees.splice(i,1);renderEmployeeSettings()}
 function addEmployee(){state.employees.push({name:'NOUVEAU SALARIÉ',rate:0});renderEmployeeSettings()}
-async function saveEmployees(){document.querySelectorAll('[data-n]').forEach(x=>state.employees[+x.dataset.n].name=x.value.trim());document.querySelectorAll('[data-r]').forEach(x=>state.employees[+x.dataset.r].rate=Number(x.value)||0);state.employees=state.employees.filter(e=>e.name);persist();options();renderTeamPicker();renderTeamSettings();renderMonth();renderRecap();renderPaidLeave();try{await pushEmployees();setSyncStatus('Supabase synchronisé ✓');alert('Salariés enregistrés et synchronisés.')}catch(err){console.error(err);setSyncStatus('Salariés sauvegardés localement',false);alert('Salariés enregistrés localement.')}}
+async function saveEmployees(){
+ const oldNames=state.employees.map(e=>e.name);
+ const newHireDates={...(state.settings.employeeHireDates||{})};
+
+ document.querySelectorAll('[data-n]').forEach(x=>state.employees[+x.dataset.n].name=x.value.trim());
+ document.querySelectorAll('[data-r]').forEach(x=>state.employees[+x.dataset.r].rate=Number(x.value)||0);
+ document.querySelectorAll('[data-hire]').forEach(x=>{
+   const i=+x.dataset.hire;
+   const oldName=oldNames[i];
+   const newName=state.employees[i]?.name;
+   if(oldName && oldName!==newName)delete newHireDates[oldName];
+   if(newName){
+     if(x.value)newHireDates[newName]=x.value;
+     else delete newHireDates[newName];
+   }
+ });
+ state.settings.employeeHireDates=newHireDates;
+ state.employees=state.employees.filter(e=>e.name);
+ persist();options();renderTeamPicker();renderTeamSettings();renderMonth();renderRecap();renderPaidLeave();
+ try{
+   await pushEmployees();
+   await pushSettings();
+   setSyncStatus('Supabase synchronisé ✓');
+   alert('Salariés, taux horaires et dates d’entrée enregistrés et synchronisés.');
+ }catch(err){
+   console.error(err);setSyncStatus('Salariés sauvegardés localement',false);
+   alert('Salariés et dates d’entrée enregistrés localement.');
+ }
+}
 async function saveSettings(){state.settings.CONT={start:el('contStart').value,end:el('contEnd').value};state.settings.CLA={start:el('claStart').value,end:el('claEnd').value,pauseStart:el('pauseStart').value,pauseEnd:el('pauseEnd').value};state.settings.SAM={start:el('samStart').value,end:state.settings.SAM.end||'14:00'};state.settings.overtime={rate1:Number(el('otRate1').value)||0,rate2:Number(el('otRate2').value)||0,thresholdHours:Number(el('otThreshold').value)||0,grace15Enabled:!!el('otGraceEnabled')?.checked};persist();updateCalc();renderRecap();try{await pushSettings();setSyncStatus('Supabase synchronisé ✓');alert('Réglages enregistrés et synchronisés.')}catch(err){console.error(err);setSyncStatus('Réglages sauvegardés localement',false);alert('Réglages enregistrés localement.')}}
 
 function teamMode(on){
