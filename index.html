@@ -471,7 +471,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V33</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V35</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -585,7 +585,7 @@ header .wrap{position:relative;z-index:1}
    <div class="field">
     <label>Période de suivi</label>
     <select id="leavePeriod"></select>
-    <div class="muted leave-period-help">Période du 1er avril au 31 mars. Les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus. Le fractionnement est calculé automatiquement selon les règles CIBTP. Le calcul automatique des droits utilise la date d’entrée du salarié ; la caisse CIBTP reste la référence en cas de droits provenant d’un autre employeur BTP ou de situations particulières.</div>
+    <div class="muted leave-period-help">Période de prise des congés CIBTP du 1er mai au 30 avril. Les samedis sont décomptés, y compris le dernier samedi avant la reprise ; les dimanches et jours fériés légaux sont exclus. Le fractionnement est calculé automatiquement selon les règles CIBTP. Le calcul automatique des droits utilise la date d’entrée du salarié ; la caisse CIBTP reste la référence en cas de droits provenant d’un autre employeur BTP ou de situations particulières.</div>
    </div>
    <div class="field">
     <label>Salarié affiché dans le résumé</label>
@@ -595,7 +595,7 @@ header .wrap{position:relative;z-index:1}
     <label>Calcul des droits acquis</label>
     <label style="display:flex;gap:9px;align-items:center;padding:10px 12px;border:1px solid #d7deea;border-radius:10px;background:#f8fafc">
      <input id="paidLeaveAutoRights" type="checkbox" style="width:auto">
-     <span><b>Calcul automatique CIBTP</b><br><span class="muted" style="font-size:11px">À partir de la date d’entrée, 2,5 j par tranche de 4 semaines, maximum 30 j.</span></span>
+     <span><b>Calcul automatique CIBTP</b><br><span class="muted" style="font-size:11px">Droits acquis sur la période CIBTP précédente, à partir de la date d’entrée, maximum 30 j.</span></span>
     </label>
    </div>
    <div class="field">
@@ -700,7 +700,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V33</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V35</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1541,15 +1541,14 @@ function todayIso(){
 function leavePeriodKeyForDate(date){
  if(!date)return '';
  const y=Number(date.slice(0,4)),m=Number(date.slice(5,7));
- return String(m>=4?y:y-1)
+ return String(m>=5?y:y-1)
 }
 function leavePeriodBounds(key){
  const y=Number(key);
- return {start:`${y}-04-01`,end:`${y+1}-03-31`}
+ return {start:`${y}-05-01`,end:`${y+1}-04-30`}
 }
 function leavePeriodLabel(key){
- const b=leavePeriodBounds(key);
- return `01/04/${key} → 31/03/${Number(key)+1}`
+ return `01/05/${key} → 30/04/${Number(key)+1}`
 }
 function initLeavePeriods(){
  const sel=el('leavePeriod');
@@ -1580,9 +1579,10 @@ function cibpAutoLegalRights(period,employee){
  if(!hire)return null;
 
  const y=Number(period);
- // Période d'acquisition CIBTP : 1er avril N -> 31 mars N+1.
- const start=`${y}-04-01`;
- const end=`${y+1}-03-31`;
+ // Pour la période de prise 01/05/Y -> 30/04/Y+1,
+ // les droits proviennent de la période d'acquisition 01/04/Y-1 -> 31/03/Y.
+ const start=`${y-1}-04-01`;
+ const end=`${y}-03-31`;
  const calcEnd=todayIso()<end?todayIso():end;
  const calcStart=hire>start?hire:start;
 
@@ -1590,11 +1590,9 @@ function cibpAutoLegalRights(period,employee){
 
  const a=new Date(calcStart+'T12:00:00');
  const b=new Date(calcEnd+'T12:00:00');
- // +1 car le premier jour de présence appartient à la période.
  const calendarDays=Math.max(0,Math.floor((b-a)/86400000)+1);
 
- // Base CIBTP : 2,5 jours par période de 4 semaines.
- // L'arrondi à l'entier supérieur est appliqué au droit calculé.
+ // Base théorique : 2,5 jours ouvrables par tranche de 4 semaines, maximum 30.
  let rights=Math.ceil((calendarDays/28)*2.5-1e-9);
  rights=Math.max(0,Math.min(30,rights));
  return rights;
@@ -1608,13 +1606,9 @@ function leaveRights(period,employee){
  return Number(state.settings.paidLeaveRights?.[period]?.[employee])||0
 }
 function fractionLeaveRows(period,employee){
- // La période CIBTP de prise liée à l'année N va du 1er mai N au 30 avril N+1.
- // Le tableau principal est découpé 01/04 -> 31/03 : on assemble donc N et avril N+1.
- const y=Number(period);
- const rows=[
-   ...leaveEntriesForPeriod(String(y),employee),
-   ...leaveEntriesForPeriod(String(y+1),employee)
- ].filter(e=>e.date>=`${y}-05-01` && e.date<=`${y+1}-04-30`);
+ // La période affichée est directement la période CIBTP de prise :
+ // 01/05/Y -> 30/04/Y+1.
+ const rows=leaveEntriesForPeriod(String(period),employee);
  const seen=new Set();
  return rows
    .filter(e=>{
@@ -1757,38 +1751,46 @@ function leaveEntriesForPeriod(period,employee=''){
        }
      }
 
-     // IMPORTANT : le dernier samedi avant la reprise doit être décompté.
-     // On cherche le premier samedi qui suit la fin de la période,
-     // jusqu'à 6 jours maximum, sans franchir une journée de travail enregistrée.
-     let probe=new Date(db);
-     for(let i=1;i<=6;i++){
-       probe=addDaysDate(db,i);
-       const iso=isoLocalDate(probe);
-       if(iso>end)break;
+     // Le samedi final n'est ajouté que s'il est dans la continuité immédiate
+     // du dernier jour de congé :
+     // - vendredi en congé -> samedi décompté ;
+     // - jeudi en congé + vendredi férié -> samedi décompté.
+     // Un congé isolé plus tôt dans la semaine ne crée jamais un samedi "fantôme".
+     const last=new Date(db+'T12:00:00');
+     const lastDow=last.getDay();
+     let saturdayIso='';
 
+     if(lastDow===5){
+       const sat=addDaysDate(last,1);
+       saturdayIso=isoLocalDate(sat);
+     }else if(lastDow===4){
+       const fri=addDaysDate(last,1);
+       const friIso=isoLocalDate(fri);
+       if(isFrenchPublicHoliday(friIso)){
+         const sat=addDaysDate(last,2);
+         saturdayIso=isoLocalDate(sat);
+       }
+     }
+
+     if(saturdayIso && saturdayIso<=end && !isFrenchPublicHoliday(saturdayIso) && !seen.has(saturdayIso)){
        const worked=state.entries.some(x=>
          x.employee===empName &&
-         x.date===iso &&
+         x.date===saturdayIso &&
          x.type!=='CGE' &&
          ['CONT','CLA','SAM','FORM'].includes(x.type)
        );
 
-       if(worked)break;
-
-       if(probe.getDay()===6){
-         if(!isFrenchPublicHoliday(iso) && !seen.has(iso)){
-           result.push({
-             id:`auto-last-sat-${empName}-${iso}`,
-             employee:empName,
-             date:iso,
-             type:'CGE',
-             comment:'Dernier samedi de congé décompté automatiquement',
-             _autoSaturday:true,
-             _autoRebuilt:true
-           });
-           seen.add(iso);
-         }
-         break;
+       if(!worked){
+         result.push({
+           id:`auto-last-sat-${empName}-${saturdayIso}`,
+           employee:empName,
+           date:saturdayIso,
+           type:'CGE',
+           comment:'Dernier samedi de congé décompté automatiquement',
+           _autoSaturday:true,
+           _autoRebuilt:true
+         });
+         seen.add(saturdayIso);
        }
      }
    }
