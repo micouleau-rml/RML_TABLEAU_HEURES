@@ -476,7 +476,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V40</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V41</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -726,7 +726,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V40</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V41</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1830,8 +1830,25 @@ function leaveEntriesForPeriod(period,employee=''){
      const cur=new Date(actual[i].date+'T12:00:00');
      const diff=Math.round((cur-prev)/86400000);
 
-     // Une coupure jusqu'à 3 jours peut être due à samedi/dimanche/jour férié.
-     if(diff<=3){
+     // Deux journées CGE appartiennent à la même période si l'intervalle
+     // ne contient aucun jour ouvrable qui devrait rompre le congé.
+     // Cela couvre notamment : jeudi 24/12 + vendredi 25 férié +
+     // samedi 26 décompté + dimanche 27 + reprise des CGE le lundi 28.
+     let onlyNonWorkingGap=true;
+     for(let d=addDaysDate(prev,1);d<cur;d=addDaysDate(d,1)){
+       const iso=isoLocalDate(d);
+       const dow=d.getDay();
+       if(dow!==0 && !isFrenchPublicHoliday(iso)){
+         // Le samedi est un jour ouvrable de congé et peut être reconstitué.
+         // Il ne coupe donc pas la période. Les autres jours ouvrables, eux, la coupent.
+         if(dow!==6){
+           onlyNonWorkingGap=false;
+           break;
+         }
+       }
+     }
+
+     if(diff<=3 || onlyNonWorkingGap){
        spanEnd=actual[i].date;
      }else{
        spans.push([spanStart,spanEnd]);
