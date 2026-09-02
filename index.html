@@ -146,6 +146,11 @@ footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);b
  }
 }
 
+
+/* V36 — Répartition droits congés */
+#leaveRightsSplitBody td{vertical-align:top}
+#leaveRightsSplitBody .badge{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:700}
+
 </style>
 <style>
 header{position:relative;overflow:hidden;background:radial-gradient(ellipse at 52% -35%,rgba(0,184,255,.82) 0%,rgba(0,184,255,.24) 31%,transparent 54%),radial-gradient(ellipse at 5% 12%,rgba(63,64,213,.72) 0%,rgba(63,64,213,.22) 35%,transparent 58%),linear-gradient(120deg,#173aa7 0%,#075fc9 48%,#123e9e 100%)!important}
@@ -471,7 +476,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V35</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V36</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -637,6 +642,27 @@ header .wrap{position:relative;z-index:1}
   </div>
 
   <div style="margin-top:18px">
+   <h3>Répartition des droits CIBTP</h3>
+   <div class="muted" style="margin-bottom:10px">
+    Les 24 premiers jours correspondent au congé principal. Les jours 25 à 30 correspondent à la 5e semaine.
+    Le fractionnement est affiché comme « Validé » uniquement lorsque les conditions sont effectivement remplies.
+   </div>
+   <div class="table-wrap">
+    <table>
+     <thead>
+      <tr>
+       <th>Salarié</th>
+       <th>Congé principal<br><span class="muted">24 premiers jours</span></th>
+       <th>5e semaine<br><span class="muted">jours 25 à 30</span></th>
+       <th>Fractionnement</th>
+      </tr>
+     </thead>
+     <tbody id="leaveRightsSplitBody"></tbody>
+    </table>
+   </div>
+  </div>
+
+  <div style="margin-top:18px">
    <h3>Détail des congés saisis</h3>
    <div class="muted" style="margin-bottom:10px">Les dates futures saisies en type CGE sont classées automatiquement dans « Congés planifiés ».</div>
    <div class="table-wrap">
@@ -700,7 +726,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V35</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V36</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1833,6 +1859,72 @@ function updateLeaveSummaryForEmployee(){
    el('leaveTotalBalance').className=after<0?'leave-negative':after<=3?'leave-warning':'leave-positive';
  }
 }
+
+function leaveRightsSplit(period,employee){
+ const rights=Math.max(0,leaveRights(period,employee));
+ const rows=leaveEntriesForPeriod(period,employee).sort((a,b)=>a.date.localeCompare(b.date));
+ const today=todayIso();
+
+ const principalEntitlement=Math.min(24,rights);
+ const fifthEntitlement=Math.max(0,Math.min(6,rights-24));
+
+ // Les jours sont affectés chronologiquement : les 24 premiers au congé principal,
+ // puis les suivants à la 5e semaine.
+ const principalRows=rows.slice(0,Math.min(24,rows.length));
+ const fifthRows=rows.slice(24,30);
+
+ const principalTaken=principalRows.filter(e=>e.date<=today).length;
+ const principalPlanned=principalRows.filter(e=>e.date>today).length;
+ const fifthTaken=fifthRows.filter(e=>e.date<=today).length;
+ const fifthPlanned=fifthRows.filter(e=>e.date>today).length;
+
+ return {
+   rights,
+   principalEntitlement,
+   fifthEntitlement,
+   principalTaken,
+   principalPlanned,
+   principalRemaining:Math.max(0,principalEntitlement-principalTaken-principalPlanned),
+   fifthTaken,
+   fifthPlanned,
+   fifthRemaining:Math.max(0,fifthEntitlement-fifthTaken-fifthPlanned)
+ };
+}
+
+function renderLeaveRightsSplit(period){
+ const body=el('leaveRightsSplitBody');
+ if(!body)return;
+
+ body.innerHTML=state.employees.map(emp=>{
+   const s=leaveRightsSplit(period,emp.name);
+   const frac=leaveFractionInfo(period,emp.name);
+   const validated=frac.days>0;
+   const fracBadge=validated
+     ? `<span class="badge CGE">Validé : ${frac.days} j</span>`
+     : `<span class="badge" style="background:#f1f5f9;color:#475569">En attente</span>`;
+
+   return `<tr>
+    <td><b>${esc(emp.name)}</b></td>
+    <td>
+     <b>${s.principalRemaining} j restant${s.principalRemaining>1?'s':''}</b>
+     <div class="muted" style="font-size:11px;margin-top:3px">
+      Droit : ${s.principalEntitlement} j · Pris : ${s.principalTaken} j · Planifié : ${s.principalPlanned} j
+     </div>
+    </td>
+    <td>
+     <b>${s.fifthRemaining} j restant${s.fifthRemaining>1?'s':''}</b>
+     <div class="muted" style="font-size:11px;margin-top:3px">
+      Droit : ${s.fifthEntitlement} j · Pris : ${s.fifthTaken} j · Planifié : ${s.fifthPlanned} j
+     </div>
+    </td>
+    <td>
+     ${fracBadge}
+     <div class="muted" style="font-size:11px;margin-top:4px">${esc(frac.reason)}</div>
+    </td>
+   </tr>`;
+ }).join('');
+}
+
 function renderPaidLeave(){
  initLeavePeriods();
  initLeaveEmployee();
@@ -1876,11 +1968,12 @@ function renderPaidLeave(){
  }).join('');
 
  document.querySelectorAll('[data-leave-right]').forEach(inp=>{
-   inp.addEventListener('input',recalcPaidLeaveFromInputs);
-   inp.addEventListener('change',recalcPaidLeaveFromInputs);
+   inp.addEventListener('input',()=>{recalcPaidLeaveFromInputs();renderLeaveRightsSplit(period)});
+   inp.addEventListener('change',()=>{recalcPaidLeaveFromInputs();renderLeaveRightsSplit(period)});
  });
 
  recalcPaidLeaveFromInputs();
+ renderLeaveRightsSplit(period);
 
  const details=leaveEntriesForPeriod(period);
  el('leaveDetailBody').innerHTML=details.length?details.map(e=>`
