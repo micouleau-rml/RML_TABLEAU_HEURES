@@ -476,7 +476,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V41</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V42</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -726,7 +726,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V41</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V42</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1819,6 +1819,40 @@ function leaveEntriesForPeriod(period,employee=''){
 
    const seen=new Set(actual.map(e=>e.date));
    result.push(...actual);
+
+   // V42 : pont explicite jeudi + vendredi férié + samedi + dimanche + lundi en congé.
+   // Exemple : 24/12/2026 CGE, 25/12 férié, 26/12 samedi, 27/12 dimanche,
+   // 28/12/2026 CGE => le samedi 26/12 doit être décompté.
+   for(const e of actual){
+     const d=new Date(e.date+'T12:00:00');
+     if(d.getDay()!==4)continue; // jeudi uniquement
+
+     const fri=addDaysDate(d,1);
+     const sat=addDaysDate(d,2);
+     const mon=addDaysDate(d,4);
+
+     const friIso=isoLocalDate(fri);
+     const satIso=isoLocalDate(sat);
+     const monIso=isoLocalDate(mon);
+
+     if(!isFrenchPublicHoliday(friIso))continue;
+     if(isFrenchPublicHoliday(satIso) || seen.has(satIso))continue;
+
+     // Le lundi doit bien faire partie de la même période de congés.
+     if(!actual.some(x=>x.date===monIso))continue;
+
+     // Le samedi est un jour ouvrable de congé : on le décompte.
+     result.push({
+       id:`auto-holiday-bridge-sat-${empName}-${satIso}`,
+       employee:empName,
+       date:satIso,
+       type:'CGE',
+       comment:'Samedi décompté automatiquement après jour férié',
+       _autoSaturday:true,
+       _autoRebuilt:true
+     });
+     seen.add(satIso);
+   }
 
    // Regrouper les jours CGE en périodes continues.
    const spans=[];
