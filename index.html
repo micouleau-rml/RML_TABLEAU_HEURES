@@ -476,7 +476,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V38</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V39</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -726,7 +726,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V38</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V39</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1834,41 +1834,52 @@ function leaveEntriesForPeriod(period,employee=''){
        }
      }
 
-     // Dernier samedi de la période :
-     // - pour une vraie période continue de congé (au moins 2 jours CGE dans le span),
-     //   rechercher le samedi qui clôt la semaine, comme en V36 ;
-     // - pour un congé isolé, ne jamais chercher plusieurs jours plus loin :
-     //   cela évite les samedis "fantômes" (ex. 05/09).
+     // Dernier samedi de la période de congé.
+     // Règle : une période continue qui se termine un vendredi décompte
+     // automatiquement le samedi suivant (sauf jour férié).
+     // Si le dernier jour est jeudi et le vendredi suivant est férié,
+     // le samedi suivant est également décompté.
+     // Un congé isolé en début/milieu de semaine ne crée aucun samedi fantôme.
      const spanActual=actual.filter(e=>e.date>=a && e.date<=b);
      const isRealLeaveSpan=spanActual.length>=2;
      const last=new Date(db+'T12:00:00');
+     const lastDow=last.getDay();
      let saturdayIso='';
 
      if(isRealLeaveSpan){
-       for(let i=1;i<=6;i++){
-         const probe=addDaysDate(last,i);
-         const iso=isoLocalDate(probe);
-         if(iso>end)break;
+       if(lastDow===5){
+         saturdayIso=isoLocalDate(addDaysDate(last,1));
+       }else if(lastDow===4){
+         const fri=addDaysDate(last,1);
+         const friIso=isoLocalDate(fri);
+         if(isFrenchPublicHoliday(friIso)){
+           saturdayIso=isoLocalDate(addDaysDate(last,2));
+         }
+       }else{
+         // Cas historique : les anciennes saisies peuvent ne pas avoir enregistré
+         // le vendredi final. On recherche le prochain samedi uniquement si tous
+         // les jours ouvrables intermédiaires sont fériés ou déjà en congé.
+         for(let i=1;i<=6;i++){
+           const probe=addDaysDate(last,i);
+           const iso=isoLocalDate(probe);
+           if(iso>end)break;
 
-         // Une reprise effective du travail met fin à la période.
-         const worked=state.entries.some(x=>
-           x.employee===empName &&
-           x.date===iso &&
-           ['CONT','CLA','SAM','FORM'].includes(x.type)
-         );
-         if(worked)break;
+           if(probe.getDay()===6){
+             if(!isFrenchPublicHoliday(iso))saturdayIso=iso;
+             break;
+           }
 
-         if(probe.getDay()===6){
-           if(!isFrenchPublicHoliday(iso))saturdayIso=iso;
-           break;
+           const dow=probe.getDay();
+           if(dow!==0 && !isFrenchPublicHoliday(iso) && !seen.has(iso)){
+             saturdayIso='';
+             break;
+           }
          }
        }
      }else{
-       // Congé isolé : seulement le samedi immédiatement rattachable.
-       const dow=last.getDay();
-       if(dow===5){
+       if(lastDow===5){
          saturdayIso=isoLocalDate(addDaysDate(last,1));
-       }else if(dow===4){
+       }else if(lastDow===4){
          const fri=addDaysDate(last,1);
          if(isFrenchPublicHoliday(isoLocalDate(fri))){
            saturdayIso=isoLocalDate(addDaysDate(last,2));
@@ -1877,24 +1888,16 @@ function leaveEntriesForPeriod(period,employee=''){
      }
 
      if(saturdayIso && saturdayIso<=end && !isFrenchPublicHoliday(saturdayIso) && !seen.has(saturdayIso)){
-       const worked=state.entries.some(x=>
-         x.employee===empName &&
-         x.date===saturdayIso &&
-         ['CONT','CLA','SAM','FORM'].includes(x.type)
-       );
-
-       if(!worked){
-         result.push({
-           id:`auto-last-sat-${empName}-${saturdayIso}`,
-           employee:empName,
-           date:saturdayIso,
-           type:'CGE',
-           comment:'Dernier samedi de congé décompté automatiquement',
-           _autoSaturday:true,
-           _autoRebuilt:true
-         });
-         seen.add(saturdayIso);
-       }
+       result.push({
+         id:`auto-last-sat-${empName}-${saturdayIso}`,
+         employee:empName,
+         date:saturdayIso,
+         type:'CGE',
+         comment:'Dernier samedi de congé décompté automatiquement',
+         _autoSaturday:true,
+         _autoRebuilt:true
+       });
+       seen.add(saturdayIso);
      }
    }
  }
