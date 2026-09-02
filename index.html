@@ -151,6 +151,22 @@ footer{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);b
 #leaveRightsSplitBody td{vertical-align:top}
 #leaveRightsSplitBody .badge{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:700}
 
+
+/* V45 — Analyse annuelle / période libre */
+.analysis-filters{align-items:end}
+.analysis-kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+.analysis-table td{vertical-align:top}
+.analysis-main{font-weight:900;font-size:15px;white-space:nowrap}
+.analysis-sub{font-size:11px;color:#64748b;margin-top:3px;white-space:nowrap}
+@media(max-width:1000px){.analysis-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.analysis-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{
+ body.analysis-print header nav,body.analysis-print #analyse .analysis-filters,
+ body.analysis-print #analyse .actions{display:none!important}
+ body.analysis-print .view{display:none!important}
+ body.analysis-print #analyse{display:block!important}
+}
+
 </style>
 <style>
 header{position:relative;overflow:hidden;background:radial-gradient(ellipse at 52% -35%,rgba(0,184,255,.82) 0%,rgba(0,184,255,.24) 31%,transparent 54%),radial-gradient(ellipse at 5% 12%,rgba(63,64,213,.72) 0%,rgba(63,64,213,.22) 35%,transparent 58%),linear-gradient(120deg,#173aa7 0%,#075fc9 48%,#123e9e 100%)!important}
@@ -476,12 +492,13 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V44</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V45</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
   <button class="tab" data-view="recap">Récapitulatif</button>
   <button class="tab" data-view="conges">Congés payés</button>
+  <button class="tab" data-view="analyse">Analyse</button>
   <button class="tab" data-view="reglages">Réglages</button>
  </nav>
 </header>
@@ -675,6 +692,55 @@ header .wrap{position:relative;z-index:1}
  </div>
 </section>
 
+
+<section id="analyse" class="view">
+ <div class="card">
+  <div class="section-title">Analyse des heures et absences</div>
+  <h2>Analyse sur une période</h2>
+  <div class="grid grid3 analysis-filters">
+   <div class="field"><label>Date de début</label><input id="analysisStart" type="date"></div>
+   <div class="field"><label>Date de fin</label><input id="analysisEnd" type="date"></div>
+   <div class="field"><label>Salarié</label><select id="analysisEmployee"><option value="">Tous les salariés</option></select></div>
+  </div>
+  <div class="actions" style="margin-top:6px">
+   <button class="primary" id="analysisRefresh">Actualiser l’analyse</button>
+   <button class="secondary" id="analysisYear">Année en cours</button>
+   <button class="secondary" id="analysisPrint">Imprimer / PDF</button>
+  </div>
+  <div class="muted" style="margin-top:10px">
+   Les heures d'absence correspondent aux heures théoriques qui auraient été travaillées. Les samedis de congés CIBTP restent comptés en jours de congé mais valent 0 h d'absence.
+  </div>
+ </div>
+
+ <div class="card">
+  <div id="analysisPeriodLabel" class="section-title">Période analysée</div>
+  <div class="kpis analysis-kpis" id="analysisKpis"></div>
+ </div>
+
+ <div class="card">
+  <h2>Détail par salarié</h2>
+  <div class="table-wrap">
+   <table class="analysis-table">
+    <thead>
+     <tr>
+      <th>Salarié</th>
+      <th>Travail</th>
+      <th>Formation</th>
+      <th>Maladie</th>
+      <th>AT</th>
+      <th>Congés</th>
+      <th>Absence</th>
+      <th>Route</th>
+      <th>H sup nettes</th>
+      <th>Paniers</th>
+     </tr>
+    </thead>
+    <tbody id="analysisBody"></tbody>
+   </table>
+  </div>
+ </div>
+</section>
+
 <section id="reglages" class="view">
  <div class="grid grid2">
   <div class="card">
@@ -726,7 +792,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V44</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V45</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -2425,7 +2491,195 @@ function ensureEmployeePlaceholder(){
  if(!sel.value)sel.value='';
 }
 
-function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='conges')renderPaidLeave();if(id==='reglages')renderSettings()}
+
+function analysisScheduledMinutesForEntry(e){
+ if(!e||!e.date)return 0;
+ const dow=new Date(e.date+'T12:00:00').getDay();
+
+ // Samedi/dimanche : aucune heure théorique d'absence.
+ if(dow===0||dow===6)return 0;
+
+ // Les absences sont valorisées sur l'horaire de journée continue,
+ // horaire de référence principal de l'entreprise.
+ const s=state.settings.CONT||{start:'07:15',end:'14:15'};
+ const a=mins(s.start),b=mins(s.end);
+ return (a!=null&&b!=null)?Math.max(0,b-a):0
+}
+
+function analysisWorkMinutes(e){
+ if(!e||!['CONT','CLA','SAM'].includes(e.type))return 0;
+ const s=state.settings[e.type]||state.settings.CONT;
+ const refStart=mins(s?.start),refEnd=mins(s?.end||s?.start);
+ const override=mins(e.startOverride);
+ const start=override!=null?override:refStart;
+ const arrivee=mins(e.arrivee);
+ const depart=mins(e.depart);
+
+ // Priorité à la présence réellement enregistrée.
+ if(start!=null && arrivee!=null)return Math.max(0,arrivee-start);
+ if(Number(e.presence)>0)return Number(e.presence);
+
+ // Pour les anciennes lignes incomplètes : fin chantier si connue, sinon horaire normal.
+ if(start!=null && depart!=null)return Math.max(0,depart-start);
+ if(refStart!=null&&refEnd!=null)return Math.max(0,refEnd-refStart);
+ return 0
+}
+
+function analysisFormationMinutes(e){
+ if(!e||e.type!=='FORM')return 0;
+ if(Number(e.presence)>0)return Number(e.presence);
+ return analysisScheduledMinutesForEntry(e)
+}
+
+function initAnalysisControls(){
+ const sel=el('analysisEmployee');
+ if(sel){
+   const keep=sel.value;
+   sel.innerHTML='<option value="">Tous les salariés</option>'+state.employees.map(e=>`<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
+   if(keep && state.employees.some(e=>e.name===keep))sel.value=keep;
+ }
+ if(!el('analysisStart')?.value || !el('analysisEnd')?.value){
+   const y=new Date().getFullYear();
+   if(el('analysisStart'))el('analysisStart').value=`${y}-01-01`;
+   if(el('analysisEnd'))el('analysisEnd').value=`${y}-12-31`;
+ }
+}
+
+function analysisEmployeeStats(employee,start,end){
+ const rows=state.entries
+   .filter(e=>e.employee===employee&&e.date>=start&&e.date<=end)
+   .slice().sort((a,b)=>a.date.localeCompare(b.date));
+ const ledger=recoveryLedger(employee);
+
+ const stats={
+   employee,work:0,formation:0,mal:0,at:0,cge:0,abs:0,
+   route:0,overtime:0,paniers:0,
+   workDays:0,formationDays:0,malDays:0,atDays:0,cgeDays:0,absDays:0
+ };
+
+ for(const e of rows){
+   if(['CONT','CLA','SAM'].includes(e.type)){
+     stats.work+=analysisWorkMinutes(e);
+     stats.workDays++;
+   }else if(e.type==='FORM'){
+     stats.formation+=analysisFormationMinutes(e);
+     stats.formationDays++;
+   }else if(e.type==='MAL'){
+     stats.mal+=analysisScheduledMinutesForEntry(e);stats.malDays++;
+   }else if(e.type==='AT'){
+     stats.at+=analysisScheduledMinutesForEntry(e);stats.atDays++;
+   }else if(e.type==='CGE'){
+     stats.cge+=analysisScheduledMinutesForEntry(e);stats.cgeDays++;
+   }else if(e.type==='ABS'){
+     stats.abs+=analysisScheduledMinutesForEntry(e);stats.absDays++;
+   }
+
+   stats.route+=Number(e.route)||0;
+   stats.overtime+=ledger[e.id]?.netReal ?? (Number(e.real)||0);
+   stats.paniers+=panierForEntry(e);
+ }
+
+ // Ajouter les samedis de congés reconstruits automatiquement au nombre de jours,
+ // sans leur attribuer d'heures théoriques.
+ const leaveRows=leaveEntriesForRangeForAnalysis(start,end,employee);
+ const actualCgeDates=new Set(rows.filter(e=>e.type==='CGE').map(e=>e.date));
+ for(const e of leaveRows){
+   if(!actualCgeDates.has(e.date)){
+     stats.cgeDays++;
+     // 0 h si samedi ; si ancien jour ouvrable reconstitué, valoriser l'horaire théorique.
+     if(new Date(e.date+'T12:00:00').getDay()!==6)stats.cge+=analysisScheduledMinutesForEntry(e);
+   }
+ }
+ return stats
+}
+
+function leaveEntriesForRangeForAnalysis(start,end,employee){
+ if(!start||!end)return [];
+ const periodKeys=new Set();
+ let d=new Date(start+'T12:00:00');
+ const last=new Date(end+'T12:00:00');
+ while(d<=last){
+   periodKeys.add(leavePeriodKeyForDate(isoLocalDate(d)));
+   d.setMonth(d.getMonth()+1);
+ }
+ const seen=new Set(),rows=[];
+ for(const p of periodKeys){
+   for(const e of leaveEntriesForPeriod(p,employee)){
+     if(e.date<start||e.date>end)continue;
+     const k=e.employee+'|'+e.date;
+     if(seen.has(k))continue;
+     seen.add(k);rows.push(e);
+   }
+ }
+ return rows
+}
+
+function renderAnalysis(){
+ initAnalysisControls();
+ const start=el('analysisStart')?.value;
+ const end=el('analysisEnd')?.value;
+ const selected=el('analysisEmployee')?.value||'';
+ if(!start||!end)return;
+ if(end<start){
+   if(el('analysisBody'))el('analysisBody').innerHTML='<tr><td colspan="10" class="empty">La date de fin doit être postérieure à la date de début.</td></tr>';
+   return;
+ }
+
+ const employees=selected?[selected]:state.employees.map(e=>e.name);
+ const stats=employees.map(emp=>analysisEmployeeStats(emp,start,end));
+
+ const total=k=>stats.reduce((a,s)=>a+(Number(s[k])||0),0);
+ const totalWork=total('work');
+ const totalFormation=total('formation');
+ const totalAbsence=total('mal')+total('at')+total('cge')+total('abs');
+ const totalRoute=total('route');
+ const totalOT=total('overtime');
+
+ if(el('analysisPeriodLabel')){
+   el('analysisPeriodLabel').textContent=`Du ${new Date(start+'T12:00:00').toLocaleDateString('fr-FR')} au ${new Date(end+'T12:00:00').toLocaleDateString('fr-FR')}${selected?' — '+selected:''}`;
+ }
+
+ if(el('analysisKpis'))el('analysisKpis').innerHTML=`
+   <div class="kpi"><span>Temps de travail</span><b>${time(totalWork)}</b></div>
+   <div class="kpi"><span>Formation</span><b>${time(totalFormation)}</b><small>${total('formationDays')} j</small></div>
+   <div class="kpi"><span>Absences rémunérées / suivies</span><b>${time(totalAbsence)}</b><small>${total('malDays')+total('atDays')+total('cgeDays')+total('absDays')} j</small></div>
+   <div class="kpi route"><span>Heures de route</span><b>${time(totalRoute)}</b></div>
+   <div class="kpi real"><span>Heures sup nettes</span><b>${time(totalOT)}</b></div>
+   <div class="kpi"><span>Maladie</span><b>${time(total('mal'))}</b><small>${total('malDays')} j</small></div>
+   <div class="kpi"><span>Accident du travail</span><b>${time(total('at'))}</b><small>${total('atDays')} j</small></div>
+   <div class="kpi"><span>Congés</span><b>${time(total('cge'))}</b><small>${total('cgeDays')} j</small></div>
+   <div class="kpi"><span>Absence</span><b>${time(total('abs'))}</b><small>${total('absDays')} j</small></div>
+   <div class="kpi"><span>Paniers</span><b>${total('paniers')}</b></div>`;
+
+ if(el('analysisBody'))el('analysisBody').innerHTML=stats.length?stats.map(s=>`
+   <tr>
+    <td><b>${esc(s.employee)}</b></td>
+    <td><div class="analysis-main">${time(s.work)}</div><div class="analysis-sub">${s.workDays} j travaillés</div></td>
+    <td><div class="analysis-main">${time(s.formation)}</div><div class="analysis-sub">${s.formationDays} j</div></td>
+    <td><div class="analysis-main">${time(s.mal)}</div><div class="analysis-sub">${s.malDays} j</div></td>
+    <td><div class="analysis-main">${time(s.at)}</div><div class="analysis-sub">${s.atDays} j</div></td>
+    <td><div class="analysis-main">${time(s.cge)}</div><div class="analysis-sub">${s.cgeDays} j ouvrables</div></td>
+    <td><div class="analysis-main">${time(s.abs)}</div><div class="analysis-sub">${s.absDays} j</div></td>
+    <td><div class="analysis-main">${time(s.route)}</div></td>
+    <td><div class="analysis-main">${time(s.overtime)}</div></td>
+    <td><div class="analysis-main">${s.paniers}</div></td>
+   </tr>`).join(''):'<tr><td colspan="10" class="empty">Aucune donnée sur cette période.</td></tr>';
+}
+
+function setAnalysisCurrentYear(){
+ const y=new Date().getFullYear();
+ el('analysisStart').value=`${y}-01-01`;
+ el('analysisEnd').value=`${y}-12-31`;
+ renderAnalysis();
+}
+
+function printAnalysis(){
+ document.body.classList.add('analysis-print');
+ window.print();
+ setTimeout(()=>document.body.classList.remove('analysis-print'),500);
+}
+
+function show(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id===id));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.view===id));if(id==='mois')renderMonth();if(id==='recap')renderRecap();if(id==='conges')renderPaidLeave();if(id==='analyse')renderAnalysis();if(id==='reglages')renderSettings()}
 function exportCsv(){const emp=el('monthEmployee').value,ym=el('monthPick').value;const rows=state.entries.filter(e=>e.employee===emp&&e.date.startsWith(ym)).sort((a,b)=>a.date.localeCompare(b.date));const data=[['Date','Salarié','Type','Embauche','Départ chantier ou atelier','Arrivée dépôt','H sup min','H route min','Déduction','H sup réelles min','Commentaire'],...rows.map(e=>[e.date,e.employee,e.type,e.startOverride||'',e.depart||'',e.arrivee||'',e.sup||0,e.route||0,e.deduction||'00:00',e.real||0,e.comment||''])];const csv=data.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download=`RML_HEURES_${emp}_${ym}.csv`;a.click();URL.revokeObjectURL(a.href)}
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>show(b.dataset.view));['employee','date','startOverride','depart','arrivee','deduction','absenceEnd'].forEach(id=>el(id)?.addEventListener('input',updateCalc));
 el('type')?.addEventListener('input',updateCalc);
@@ -2457,6 +2711,12 @@ if(el('saveLeaveRights'))el('saveLeaveRights').onclick=async()=>{
  try{await saveLeaveRights()}finally{b.disabled=false;b.textContent=old}
 };
 if(el('printLeave'))el('printLeave').onclick=()=>window.print();
+if(el('analysisRefresh'))el('analysisRefresh').onclick=renderAnalysis;
+if(el('analysisYear'))el('analysisYear').onclick=setAnalysisCurrentYear;
+if(el('analysisPrint'))el('analysisPrint').onclick=printAnalysis;
+if(el('analysisStart'))el('analysisStart').onchange=renderAnalysis;
+if(el('analysisEnd'))el('analysisEnd').onchange=renderAnalysis;
+if(el('analysisEmployee'))el('analysisEmployee').onchange=renderAnalysis;
 el('exportCsv').onclick=exportCsv;el('printRecap').onclick=()=>window.print();el('syncNow').onclick=syncFromCloud;window.addEventListener('online',syncFromCloud);window.addEventListener('offline',()=>setSyncStatus('Hors ligne — sauvegarde locale',false));
 options();ensureEmployeePlaceholder();setToday();if(el('employee'))el('employee').value='';renderSettings();renderTeamPicker();teamMode(false);updateCalc();renderMonth();renderRecap();renderPaidLeave();syncFromCloud();
 </script>
