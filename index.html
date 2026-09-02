@@ -476,7 +476,7 @@ header .wrap{position:relative;z-index:1}
 <circle cx="110" cy="65" r="4.5" fill="white"/>
 <text x="110" y="137" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900" fill="white">RML</text>
 <text x="110" y="181" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="900" fill="#ffd400">HEURES</text>
-</svg></div><div><h1>RML HEURES<span class="app-version-top">V42</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
+</svg></div><div><h1>RML HEURES<span class="app-version-top">V44</span></h1><small>Suivi embauche · débauche · heures supplémentaires</small></div></div>
  <nav>
   <button class="tab active" data-view="saisie">Saisie</button>
   <button class="tab" data-view="mois">Mois</button>
@@ -726,7 +726,7 @@ header .wrap{position:relative;z-index:1}
 </div>
 </section>
 </main>
-<footer><div class="footer-inner"><span>RML HEURES — V42</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
+<footer><div class="footer-inner"><span>RML HEURES — V44</span><span id="syncStatus">Connexion Supabase…</span></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const SUPABASE_URL="https://dbsibzcqhtecknpkkuxa.supabase.co";
@@ -1205,15 +1205,36 @@ function isRealWorkDay(e){
  return !!e && ['CONT','CLA','SAM'].includes(e.type)
 }
 function earlyLeaveDebit(e){
- if(!e||!e.date||!isRealWorkDay(e))return 0;
- const s=state.settings[e.type]||state.settings.CONT;
+ // V44 : la récupération pour retour anticipé au dépôt ne s'applique
+ // qu'aux journées continues (CONT / travail sur chantier).
+ if(!e||!e.date||e.type!=='CONT')return 0;
+
+ const s=state.settings.CONT;
  const refStart=mins(s.start),refEnd=mins(s.end||s.start);
  const override=mins(e.startOverride);
  const start=override!=null?override:refStart;
  const normalEnd=override!=null?start+Math.max(0,refEnd-refStart):refEnd;
+
+ // V44 — Temps à récupérer, uniquement en journée continue / chantier :
+ // le trajet chantier/atelier -> dépôt reste du temps de travail.
+ // Le débit commence uniquement à l'heure d'arrivée au dépôt.
+ //
+ // Exemple :
+ // départ chantier 13h00, arrivée dépôt 13h30, débauche normale 14h15
+ // => 45 minutes à récupérer, et non 1h15.
+ const arrivee=mins(e.arrivee);
+
+ if(normalEnd==null)return 0;
+
+ // Pour les anciennes journées sans heure d'arrivée dépôt, on conserve
+ // exceptionnellement le départ chantier comme valeur de repli afin de ne
+ // pas effacer leurs anciens débits. Dès qu'une arrivée dépôt existe,
+ // elle devient la seule référence.
  const depart=mins(e.depart);
- if(depart==null||normalEnd==null)return 0;
- return Math.max(0,normalEnd-depart)
+ const recoveryStart=arrivee!=null?arrivee:depart;
+
+ if(recoveryStart==null)return 0;
+ return Math.max(0,normalEnd-recoveryStart)
 }
 function recoveryLedger(employee){
  const rows=state.entries.filter(e=>e.employee===employee&&e.date).slice().sort((a,b)=>a.date.localeCompare(b.date));
